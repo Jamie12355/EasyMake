@@ -4,10 +4,11 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vercel dev",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vercel dev",
+    "deploy": "vercel --prod"
   },
   "dependencies": {
     "lucide-react": "^0.575.0",
@@ -23,6 +24,7 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
     "globals": "^16.5.0",
+    "vercel": "^50.25.4",
     "vite": "^7.3.1"
   }
 }
