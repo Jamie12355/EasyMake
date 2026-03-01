@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Sparkles, Wand2, Copy, Video, CheckCircle2, ArrowRight, Play, FastForward, Globe, Settings2, ChevronDown, ChevronUp, Image } from 'lucide-react';
+import { Sparkles, Wand2, Copy, Video, CheckCircle2, ArrowRight, Play, FastForward, Globe, Settings2, ChevronDown, ChevronUp, Image, Film } from 'lucide-react';
 import { generateContent, generateVideo, generateImage } from './api';
+import VideoPipeline from './VideoPipeline';
 import './index.css';
 import './App.css';
 
@@ -15,6 +16,8 @@ const i18n = {
     ideaPlaceholder: "例如：介绍我们的英国本科名校申请服务...",
     ideaFooter: "只需点击一次，剩下的交给我们。",
     generateBtn: "一键生成魔法",
+    directorModeBtn: "🎬 视频导演模式 (AI 自动剪辑)",
+    directorModeDesc: "脚本 → 配音 → 分镜 → Luma → 剪辑拼接 → 9:16 导出",
     statusTitle: "魔法正在生效",
     statusTextActive: "正在为您撰写极具吸引力的爆款文案...",
     statusTextDone: "文案撰写完成",
@@ -91,6 +94,8 @@ const i18n = {
     ideaPlaceholder: "e.g., Introduction to our UK University application service...",
     ideaFooter: "Press exactly one button. We do the rest.",
     generateBtn: "Generate Magic",
+    directorModeBtn: "🎬 Video Director Mode (AI Auto-Edit)",
+    directorModeDesc: "Script → TTS → Storyboard → Luma → Stitch → 9:16 Export",
     statusTitle: "Crafting Your Content",
     statusTextActive: "Writing captivating Chinese social media copy...",
     statusTextDone: "Copywriting Completed",
@@ -182,6 +187,7 @@ function App() {
   const [generateTextEnabled, setGenerateTextEnabled] = useState(true);
   const [generateVideoEnabled, setGenerateVideoEnabled] = useState(true);
   const [generateImageEnabled, setGenerateImageEnabled] = useState(true);
+  const [pipelineMode, setPipelineMode] = useState(false);
 
   const t = i18n[lang];
 
@@ -642,6 +648,33 @@ function App() {
               )}
             </div>
 
+            <div style={{ marginTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {/* Director Mode Banner */}
+              <div
+                onClick={() => idea.trim() && setPipelineMode(true)}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem',
+                  padding: '1rem 1.25rem', borderRadius: '14px', cursor: idea.trim() ? 'pointer' : 'not-allowed',
+                  background: 'linear-gradient(135deg, rgba(139,92,246,0.12), rgba(59,130,246,0.08))',
+                  border: '1px solid rgba(139,92,246,0.25)', opacity: idea.trim() ? 1 : 0.4,
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={e => { if (idea.trim()) e.currentTarget.style.background = 'linear-gradient(135deg, rgba(139,92,246,0.22), rgba(59,130,246,0.15))'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'linear-gradient(135deg, rgba(139,92,246,0.12), rgba(59,130,246,0.08))'; }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                  <div style={{ background: 'linear-gradient(135deg, var(--accent-primary), #3b82f6)', padding: '0.6rem', borderRadius: '10px', display: 'flex' }}>
+                    <Film size={18} color="white" />
+                  </div>
+                  <div>
+                    <div style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: '0.9rem' }}>{t.directorModeBtn}</div>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', marginTop: '1px' }}>{t.directorModeDesc}</div>
+                  </div>
+                </div>
+                <ArrowRight size={16} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
+              </div>
+            </div>
+
             <div className="flex justify-between items-center mt-6 flex-mobile-col">
               <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
                 {t.ideaFooter} • {t.generationsLeft} <strong style={{ color: generationsUsed >= 99 ? '#ef4444' : '#10b981' }}>{99 - generationsUsed}/99</strong>
@@ -662,6 +695,21 @@ function App() {
 
         {renderStatus()}
         {renderResult()}
+
+        {/* Video Pipeline Director Mode */}
+        {pipelineMode && (
+          <div className="mt-8">
+            <VideoPipeline
+              idea={idea}
+              advanced={advancedArgs}
+              lang={lang}
+              onClose={() => {
+                setPipelineMode(false);
+                setStatus('idle');
+              }}
+            />
+          </div>
+        )}
 
         {status === 'completed' && (
           <div className="flex justify-center mt-12 mb-8 animate-fade-in">
