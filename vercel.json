@@ -35,5 +35,11 @@
                 }
             ]
         }
+    ],
+    "rewrites": [
+        {
+            "source": "/((?!api|ffmpeg|assets|.*\\..*).*)",
+            "destination": "/index.html"
+        }
     ]
 }
