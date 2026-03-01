@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { FFmpeg } from '@ffmpeg/ffmpeg';
-import { fetchFile, toBlobURL } from '@ffmpeg/util';
 import { Film, Mic, Scissors, Download, CheckCircle2, Loader2, AlertCircle, Play, ChevronRight, Plus, Minus, Sparkles, Pencil, ArrowRight } from 'lucide-react';
+
 
 const DEFAULT_SCENE = (id) => ({
     scene_id: id,
@@ -28,8 +27,8 @@ export default function VideoPipeline({ idea, advanced = {}, lang = 'zh', onClos
     const [currentStep, setCurrentStep] = useState('');
     const [finalVideoUrl, setFinalVideoUrl] = useState(null);
     const [error, setError] = useState(null);
-    const ffmpegRef = useRef(null);
     const hasStarted = useRef(false);
+
 
     const addLog = useCallback((msg) => {
         setLog(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`]);
@@ -103,48 +102,6 @@ export default function VideoPipeline({ idea, advanced = {}, lang = 'zh', onClos
         }
     };
 
-    const loadFFmpeg = async () => {
-        const ffmpeg = new FFmpeg();
-        ffmpegRef.current = ffmpeg;
-
-        // Try self-hosted (fastest, no CDN latency) then fall back to CDNs
-        const sources = [
-            { label: '本地文件 (fastest)', base: '/ffmpeg' },
-            { label: 'unpkg CDN', base: 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd' },
-            { label: 'jsdelivr CDN', base: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd' },
-        ];
-
-        // Track progress for the WASM download
-        ffmpeg.on('progress', ({ progress }) => {
-            if (progress < 1) {
-                addLog(`⤵️ ffmpeg 加载进度: ${Math.round(progress * 100)}%`);
-            }
-        });
-
-        // Always use self-hosted worker.js as blob URL to avoid COEP cross-origin Worker block
-        const workerURL = await toBlobURL('/ffmpeg/ffmpeg-worker.js', 'text/javascript');
-
-        let lastError = null;
-        for (const src of sources) {
-            try {
-                addLog(`加载 ffmpeg.wasm (${src.label})...`);
-                await ffmpeg.load({
-                    coreURL: await toBlobURL(`${src.base}/ffmpeg-core.js`, 'text/javascript'),
-                    wasmURL: await toBlobURL(`${src.base}/ffmpeg-core.wasm`, 'application/wasm'),
-                    workerURL,
-                });
-                addLog('✅ ffmpeg.wasm 加载成功 (' + src.label + ')');
-                return ffmpeg;
-            } catch (e) {
-                lastError = e;
-                addLog(`⚠️ ${src.label} 失败，尝试下一个...`);
-            }
-        }
-
-        const errMsg = lastError?.message || String(lastError) || 'ffmpeg.wasm 加载失败';
-        throw new Error(errMsg);
-    };
-
     const pollScenes = async (scenesData) => {
         const jobIds = scenesData.map(s => s.luma_job_id);
         let completed = new Array(scenesData.length).fill(false);
@@ -175,41 +132,37 @@ export default function VideoPipeline({ idea, advanced = {}, lang = 'zh', onClos
 
     const stitchVideos = async (finalScenes) => {
         setCurrentStep('stitch');
-        addLog('加载 ffmpeg.wasm...');
-        const ffmpeg = await loadFFmpeg();
+        addLog('提交云端混流剪辑任务...');
+
         const validScenes = finalScenes.filter(s => s.status === 'completed' && s.video_url);
         if (validScenes.length === 0) throw new Error('没有可用的视频片段');
-        addLog(`开始下载 ${validScenes.length} 个片段...`);
-        const fileList = [];
-        for (let i = 0; i < validScenes.length; i++) {
-            const scene = validScenes[i];
-            const vidName = `scene${i}.mp4`;
-            const audName = `scene${i}.mp3`;
-            const mergedName = `merged${i}.mp4`;
-            addLog(`下载 Scene ${i + 1}...`);
-            await ffmpeg.writeFile(vidName, await fetchFile(scene.video_url));
-            const base64Data = scene.tts_audio.split(',')[1];
-            const binaryString = atob(base64Data);
-            const bytes = new Uint8Array(binaryString.length);
-            for (let j = 0; j < binaryString.length; j++) bytes[j] = binaryString.charCodeAt(j);
-            await ffmpeg.writeFile(audName, bytes);
-            addLog(`合并配音 Scene ${i + 1}...`);
-            await ffmpeg.exec(['-i', vidName, '-i', audName, '-c:v', 'copy', '-c:a', 'aac', '-shortest', '-y', mergedName]);
-            fileList.push(mergedName);
+
+        try {
+            const res = await fetch('/api/pipeline-stitch', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ scenes: validScenes })
+            });
+
+            if (!res.ok) {
+                const errData = await res.json();
+                throw new Error(errData.error || '云端混流失败');
+            }
+
+            const data = await res.json();
+
+            if (!data.video_url) {
+                throw new Error('云端混流未返回视频链接');
+            }
+
+            addLog('✅ 剪辑完毕！');
+            return data.video_url;
+        } catch (err) {
+            console.error('Stitch error:', err);
+            throw new Error(err.message || '云剪辑服务连接失败');
         }
-        addLog('拼接所有场景...');
-        const concatContent = fileList.map(f => `file '${f}'`).join('\n');
-        await ffmpeg.writeFile('concat_list.txt', new TextEncoder().encode(concatContent));
-        await ffmpeg.exec([
-            '-f', 'concat', '-safe', '0', '-i', 'concat_list.txt',
-            '-vf', 'scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black',
-            '-c:v', 'libx264', '-preset', 'fast', '-crf', '23', '-c:a', 'aac', '-b:a', '128k', '-y', 'output.mp4'
-        ]);
-        addLog('✅ 剪辑完毕！');
-        const data = await ffmpeg.readFile('output.mp4');
-        const blob = new Blob([data.buffer], { type: 'video/mp4' });
-        return URL.createObjectURL(blob);
     };
+
 
     const runPipeline = async () => {
         const validScenes = scenes.filter(s => s.tts_text.trim());
