@@ -325,6 +325,13 @@ h1-gradient {
   .result-grid {
     grid-template-columns: 1fr 1fr;
   }
+
+  .result-grid.single-col {
+    grid-template-columns: 1fr;
+    max-width: 800px;
+    margin-left: auto;
+    margin-right: auto;
+  }
 }
 
 .card-title {

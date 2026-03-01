@@ -72,6 +72,7 @@ const i18n = {
     limitReached: "今日额度已用完",
     limitReachedDesc: "为控制 API 成本，每个用户每天最多生成 99 次 (搭载 Luma Ray Flash 2 混合渲染模型)",
     generationsLeft: "今日剩余生成次数:",
+    genVideoLabel: "附加生成视频动画 (Luma Ray Flash 2)",
   },
   en: {
     dashboard: "Dashboard",
@@ -140,6 +141,7 @@ const i18n = {
     limitReached: "Daily Limit Reached",
     limitReachedDesc: "To control API costs, each user is limited to 99 generations per day (using Luma Ray Flash 2)",
     generationsLeft: "Daily generations remaining:",
+    genVideoLabel: "Also Generate Animation (Luma Ray Flash 2)",
   }
 };
 
@@ -163,6 +165,7 @@ function App() {
     cta: false
   });
   const [generationsUsed, setGenerationsUsed] = useState(0);
+  const [generateVideoEnabled, setGenerateVideoEnabled] = useState(true);
 
   const t = i18n[lang];
 
@@ -212,15 +215,17 @@ function App() {
         videoUrl: null
       });
 
-      setStatus("generating_video");
+      if (generateVideoEnabled) {
+        setStatus("generating_video");
 
-      // 2. Generate Video via Luma Ray Flash 2
-      const finalVideoUrl = await generateVideo(llmResult.video_prompt);
+        // 2. Generate Video via Luma Ray Flash 2
+        const finalVideoUrl = await generateVideo(llmResult.video_prompt);
 
-      setResult(prev => ({
-        ...prev,
-        videoUrl: finalVideoUrl || "/uk_university_ad.png" // Fallback if no URL returned somehow
-      }));
+        setResult(prev => ({
+          ...prev,
+          videoUrl: finalVideoUrl || "/uk_university_ad.png" // Fallback if no URL returned somehow
+        }));
+      }
 
       setStatus("completed");
 
@@ -259,15 +264,17 @@ function App() {
           </div>
 
           {/* Video Generation Step */}
-          <div className={`status-card ${status === 'generating_video' ? 'active-video' : status === 'completed' ? 'active' : 'inactive'}`}>
-            <div className={`status-icon ${status === 'generating_video' ? 'pulse' : status === 'completed' ? 'success' : ''}`}>
-              {status === 'completed' ? <CheckCircle2 size={20} color="white" /> : <Video size={20} color="white" />}
+          {generateVideoEnabled && (
+            <div className={`status-card ${status === 'generating_video' ? 'active-video' : status === 'completed' ? 'active' : 'inactive'}`}>
+              <div className={`status-icon ${status === 'generating_video' ? 'pulse' : status === 'completed' ? 'success' : ''}`}>
+                {status === 'completed' ? <CheckCircle2 size={20} color="white" /> : <Video size={20} color="white" />}
+              </div>
+              <div className="status-text">
+                <h4>{status === 'generating_video' ? t.statusVidActive : status === 'completed' ? t.statusVidDone : t.statusVidWait}</h4>
+                <p>{t.statusVidDesc}</p>
+              </div>
             </div>
-            <div className="status-text">
-              <h4>{status === 'generating_video' ? t.statusVidActive : status === 'completed' ? t.statusVidDone : t.statusVidWait}</h4>
-              <p>{t.statusVidDesc}</p>
-            </div>
-          </div>
+          )}
         </div>
       </div>
     );
@@ -277,7 +284,7 @@ function App() {
     if (!result || status === "idle" || status === "generating_text") return null;
 
     return (
-      <div className="result-grid animate-fade-in mt-12">
+      <div className={`result-grid animate-fade-in mt-12 ${!generateVideoEnabled ? 'single-col' : ''}`}>
         {/* Text Result */}
         <div className="glass-panel flex-col flex">
           <div className="flex justify-between items-center mb-6">
@@ -299,45 +306,47 @@ function App() {
         </div>
 
         {/* Video Result */}
-        <div className="glass-panel flex-col flex">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="card-title m-0">
-              <Video style={{ color: 'var(--accent-secondary)' }} />
-              {t.resultVidTitle}
-            </h3>
-            <button className="btn-secondary text-sm">
-              <FastForward size={16} />
-              {t.downloadBtn}
-            </button>
-          </div>
-          <div className="video-container" style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            {result.videoUrl ? (
-              result.videoUrl.endsWith('.mp4') ? (
-                <video
-                  src={result.videoUrl}
-                  autoPlay
-                  loop
-                  muted
-                  controls
-                  style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', inset: 0 }}
-                />
-              ) : (
-                <>
-                  <img
+        {generateVideoEnabled && (
+          <div className="glass-panel flex-col flex">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="card-title m-0">
+                <Video style={{ color: 'var(--accent-secondary)' }} />
+                {t.resultVidTitle}
+              </h3>
+              <button className="btn-secondary text-sm">
+                <FastForward size={16} />
+                {t.downloadBtn}
+              </button>
+            </div>
+            <div className="video-container" style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {result.videoUrl ? (
+                result.videoUrl.endsWith('.mp4') ? (
+                  <video
                     src={result.videoUrl}
-                    alt="Generated Animation Thumbnail"
-                    style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', inset: 0, opacity: 0.8 }}
+                    autoPlay
+                    loop
+                    muted
+                    controls
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', inset: 0 }}
                   />
-                  <div style={{ position: 'relative', zIndex: 10, background: 'rgba(255,255,255,0.2)', padding: '1.5rem', borderRadius: '50%', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.5)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
-                    <Play size={40} color="white" style={{ fill: 'white', marginLeft: '5px' }} />
-                  </div>
-                </>
-              )
-            ) : (
-              <div className="pulse" style={{ color: 'var(--text-secondary)' }}>Rendering Video from Cloud...</div>
-            )}
+                ) : (
+                  <>
+                    <img
+                      src={result.videoUrl}
+                      alt="Generated Animation Thumbnail"
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', inset: 0, opacity: 0.8 }}
+                    />
+                    <div style={{ position: 'relative', zIndex: 10, background: 'rgba(255,255,255,0.2)', padding: '1.5rem', borderRadius: '50%', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.5)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
+                      <Play size={40} color="white" style={{ fill: 'white', marginLeft: '5px' }} />
+                    </div>
+                  </>
+                )
+              ) : (
+                <div className="pulse" style={{ color: 'var(--text-secondary)' }}>Rendering Video from Cloud...</div>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     );
   };
@@ -393,6 +402,18 @@ function App() {
               value={idea}
               onChange={(e) => setIdea(e.target.value)}
             />
+
+            <div style={{ marginTop: '1.5rem', display: 'flex', alignItems: 'center' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--text-primary)', fontSize: '1rem', cursor: 'pointer', fontWeight: 500, background: 'rgba(255,255,255,0.03)', padding: '0.8rem 1.2rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <input
+                  type="checkbox"
+                  checked={generateVideoEnabled}
+                  onChange={(e) => setGenerateVideoEnabled(e.target.checked)}
+                  style={{ width: '18px', height: '18px', accentColor: 'var(--accent-primary)', cursor: 'pointer' }}
+                />
+                {t.genVideoLabel}
+              </label>
+            </div>
 
             <div style={{ marginTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1.5rem' }}>
               <button
