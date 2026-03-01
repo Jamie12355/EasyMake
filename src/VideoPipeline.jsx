@@ -1,19 +1,31 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile, toBlobURL } from '@ffmpeg/util';
-import { Film, Mic, Scissors, Download, CheckCircle2, Loader2, AlertCircle, Play, ChevronRight } from 'lucide-react';
+import { Film, Mic, Scissors, Download, CheckCircle2, Loader2, AlertCircle, Play, ChevronRight, Plus, Minus, Sparkles, Pencil, ArrowRight } from 'lucide-react';
 
-const PIPELINE_STEPS = [
-    { id: 'script', label_zh: '分镜脚本生成', label_en: 'Generating Storyboard', icon: Film },
-    { id: 'luma', label_zh: '多镜头视频渲染', label_en: 'Rendering Video Scenes', icon: Film },
-    { id: 'stitch', label_zh: '剪辑拼接 + 字幕烧录', label_en: 'Stitching + Subtitles', icon: Scissors },
-    { id: 'done', label_zh: '视频导出完成', label_en: 'Export Complete', icon: Download },
-];
+const DEFAULT_SCENE = (id) => ({
+    scene_id: id,
+    scene_label: id === 1 ? 'Hook' : id === 2 ? 'Main Message' : id === 3 ? 'Call to Action' : `Scene ${id}`,
+    scene_label_zh: id === 1 ? '开场钩子' : id === 2 ? '核心卖点' : id === 3 ? '引导行动' : `第${id}幕`,
+    tts_text: '',
+    luma_prompt: '',
+    luma_job_id: null,
+    tts_audio: null,
+    video_url: null,
+    status: 'pending',
+    ai_filling: false,
+});
+
+const MIN_SCENES = 2;
+const MAX_SCENES = 5;
 
 export default function VideoPipeline({ idea, advanced = {}, lang = 'zh', onClose }) {
+    // Phase: 'plan' | 'execute' | 'done'
+    const [phase, setPhase] = useState('plan');
+    const [sceneCount, setSceneCount] = useState(3);
+    const [scenes, setScenes] = useState([DEFAULT_SCENE(1), DEFAULT_SCENE(2), DEFAULT_SCENE(3)]);
     const [log, setLog] = useState([]);
-    const [currentStep, setCurrentStep] = useState(''); // 'script' | 'luma' | 'stitch' | 'done' | 'error'
-    const [scenes, setScenes] = useState([]);
+    const [currentStep, setCurrentStep] = useState('');
     const [finalVideoUrl, setFinalVideoUrl] = useState(null);
     const [error, setError] = useState(null);
     const ffmpegRef = useRef(null);
@@ -23,15 +35,78 @@ export default function VideoPipeline({ idea, advanced = {}, lang = 'zh', onClos
         setLog(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`]);
     }, []);
 
+    // --- Scene count management ---
+    const adjustSceneCount = (delta) => {
+        const newCount = Math.min(MAX_SCENES, Math.max(MIN_SCENES, sceneCount + delta));
+        setSceneCount(newCount);
+        setScenes(prev => {
+            if (delta > 0) {
+                return [...prev, DEFAULT_SCENE(prev.length + 1)];
+            } else {
+                return prev.slice(0, newCount);
+            }
+        });
+    };
+
+    const updateScene = (index, field, value) => {
+        setScenes(prev => prev.map((s, i) => i === index ? { ...s, [field]: value } : s));
+    };
+
+    // AI auto-fill a single scene's tts_text via DeepSeek
+    const aiAutoFillScene = async (index) => {
+        setScenes(prev => prev.map((s, i) => i === index ? { ...s, ai_filling: true } : s));
+        try {
+            const scene = scenes[index];
+            const res = await fetch('/api/content', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    idea: `为以下视频分镜写一句中文旁白：\n主题：${idea || '留学机构介绍'}\n场景角色：${scene.scene_label_zh}（${scene.scene_label}）\n要求：不超过25个中文字，简洁有力，适合视频配音`,
+                    advanced: { ...advanced, _singleLine: true }
+                })
+            });
+            const data = await res.json();
+            // Extract just a short punchy line from the result
+            const text = data.social_media_post || '';
+            const firstLine = text.split(/\n/)[0].replace(/[#@！!]/g, '').trim().slice(0, 25);
+            updateScene(index, 'tts_text', firstLine);
+
+            // Also generate a Luma prompt
+            const lumaPrompt = data.video_prompt || '';
+            if (lumaPrompt) updateScene(index, 'luma_prompt', lumaPrompt);
+        } catch (e) {
+            console.error('AI fill failed:', e);
+        }
+        setScenes(prev => prev.map((s, i) => i === index ? { ...s, ai_filling: false } : s));
+    };
+
+    // AI auto-fill ALL scenes at once via the pipeline init endpoint
+    const aiAutoFillAll = async () => {
+        setScenes(prev => prev.map(s => ({ ...s, ai_filling: true })));
+        try {
+            const res = await fetch('/api/pipeline-generate-script', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ idea, advanced, scene_count: sceneCount })
+            });
+            if (!res.ok) throw new Error('Script generation failed');
+            const { scenes: generated } = await res.json();
+            setScenes(generated.map((s, i) => ({
+                ...DEFAULT_SCENE(i + 1),
+                ...s,
+                ai_filling: false,
+                status: 'pending'
+            })));
+        } catch (e) {
+            console.error('Auto fill all failed:', e);
+            setScenes(prev => prev.map(s => ({ ...s, ai_filling: false })));
+        }
+    };
+
+    // --- Pipeline Execution ---
     const loadFFmpeg = async () => {
         const ffmpeg = new FFmpeg();
         ffmpegRef.current = ffmpeg;
-        ffmpeg.on('log', ({ message }) => {
-            if (message.includes('frame') || message.includes('time=')) {
-                console.log('[ffmpeg]', message);
-            }
-        });
-
         const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
         await ffmpeg.load({
             coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
@@ -45,304 +120,331 @@ export default function VideoPipeline({ idea, advanced = {}, lang = 'zh', onClos
         const jobIds = scenesData.map(s => s.luma_job_id);
         let completed = new Array(scenesData.length).fill(false);
         let updatedScenes = [...scenesData];
-
-        addLog(`正在监控 ${jobIds.length} 个 Luma Ray 2 渲染任务...`);
-
+        addLog(`监控 ${jobIds.length} 个 Luma 渲染任务...`);
         while (!completed.every(Boolean)) {
             await new Promise(r => setTimeout(r, 5000));
-
             const res = await fetch(`/api/pipeline-status?ids=${jobIds.join(',')}`);
             if (!res.ok) continue;
             const { results } = await res.json();
-
             results.forEach((r, i) => {
                 if (r.status === 'completed' && r.video_url) {
-                    if (!completed[i]) {
-                        addLog(`✅ Scene ${i + 1} 渲染完成！`);
-                    }
+                    if (!completed[i]) addLog(`✅ Scene ${i + 1} 渲染完成`);
                     completed[i] = true;
                     updatedScenes[i] = { ...updatedScenes[i], video_url: r.video_url, status: 'completed' };
                 } else if (r.status === 'failed') {
                     completed[i] = true;
                     updatedScenes[i] = { ...updatedScenes[i], status: 'failed' };
-                    addLog(`❌ Scene ${i + 1} 渲染失败`);
+                    addLog(`❌ Scene ${i + 1} 失败`);
                 } else {
-                    addLog(`⏳ Scene ${i + 1} 渲染中... (${r.status})`);
+                    addLog(`⏳ Scene ${i + 1} 渲染中...`);
                 }
             });
-
             setScenes([...updatedScenes]);
         }
-
         return updatedScenes;
     };
 
     const stitchVideos = async (finalScenes) => {
         setCurrentStep('stitch');
-        addLog('正在加载 ffmpeg.wasm 视频编辑引擎...');
+        addLog('加载 ffmpeg.wasm...');
         const ffmpeg = await loadFFmpeg();
-
         const validScenes = finalScenes.filter(s => s.status === 'completed' && s.video_url);
-        if (validScenes.length === 0) throw new Error('No valid scenes to stitch');
-
-        addLog(`开始下载 ${validScenes.length} 个视频片段...`);
-
-        // Download all videos + audios into ffmpeg virtual filesystem
+        if (validScenes.length === 0) throw new Error('没有可用的视频片段');
+        addLog(`开始下载 ${validScenes.length} 个片段...`);
         const fileList = [];
         for (let i = 0; i < validScenes.length; i++) {
             const scene = validScenes[i];
             const vidName = `scene${i}.mp4`;
             const audName = `scene${i}.mp3`;
             const mergedName = `merged${i}.mp4`;
-
-            addLog(`下载 Scene ${i + 1} 视频...`);
+            addLog(`下载 Scene ${i + 1}...`);
             await ffmpeg.writeFile(vidName, await fetchFile(scene.video_url));
-
-            addLog(`写入 Scene ${i + 1} 语音...`);
-            // TTS is base64 encoded — convert to Uint8Array
             const base64Data = scene.tts_audio.split(',')[1];
             const binaryString = atob(base64Data);
             const bytes = new Uint8Array(binaryString.length);
-            for (let j = 0; j < binaryString.length; j++) {
-                bytes[j] = binaryString.charCodeAt(j);
-            }
+            for (let j = 0; j < binaryString.length; j++) bytes[j] = binaryString.charCodeAt(j);
             await ffmpeg.writeFile(audName, bytes);
-
-            // Merge video + audio for this scene, pad audio to video duration
-            addLog(`配音合并 Scene ${i + 1}...`);
-            await ffmpeg.exec([
-                '-i', vidName,
-                '-i', audName,
-                '-c:v', 'copy',
-                '-c:a', 'aac',
-                '-shortest',
-                '-y',
-                mergedName
-            ]);
-
+            addLog(`合并配音 Scene ${i + 1}...`);
+            await ffmpeg.exec(['-i', vidName, '-i', audName, '-c:v', 'copy', '-c:a', 'aac', '-shortest', '-y', mergedName]);
             fileList.push(mergedName);
         }
-
-        // Create concat file list
-        addLog('正在拼接所有场景...');
+        addLog('拼接所有场景...');
         const concatContent = fileList.map(f => `file '${f}'`).join('\n');
-        const encoder = new TextEncoder();
-        await ffmpeg.writeFile('concat_list.txt', encoder.encode(concatContent));
-
-        // Concatenate all scenes
+        await ffmpeg.writeFile('concat_list.txt', new TextEncoder().encode(concatContent));
         await ffmpeg.exec([
-            '-f', 'concat',
-            '-safe', '0',
-            '-i', 'concat_list.txt',
-            '-vf', `subtitles=no,scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black`,
-            '-c:v', 'libx264',
-            '-preset', 'fast',
-            '-crf', '23',
-            '-c:a', 'aac',
-            '-b:a', '128k',
-            '-y',
-            'output.mp4'
+            '-f', 'concat', '-safe', '0', '-i', 'concat_list.txt',
+            '-vf', 'scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black',
+            '-c:v', 'libx264', '-preset', 'fast', '-crf', '23', '-c:a', 'aac', '-b:a', '128k', '-y', 'output.mp4'
         ]);
-
-        addLog('✅ 剪辑完成！正在生成下载链接...');
+        addLog('✅ 剪辑完毕！');
         const data = await ffmpeg.readFile('output.mp4');
         const blob = new Blob([data.buffer], { type: 'video/mp4' });
         return URL.createObjectURL(blob);
     };
 
-    const runPipeline = useCallback(async () => {
-        if (!idea) return;
-        setCurrentStep('script');
+    const runPipeline = async () => {
+        const validScenes = scenes.filter(s => s.tts_text.trim());
+        if (validScenes.length === 0) return;
+        setPhase('execute');
+        setCurrentStep('tts_luma');
         setError(null);
         setLog([]);
-        setScenes([]);
         setFinalVideoUrl(null);
-
         try {
-            // STEP 1: Init pipeline (script + luma + TTS)
-            addLog('正在生成视频脚本与分镜方案...');
-            const initRes = await fetch('/api/pipeline-init', {
+            addLog(`开始执行 ${validScenes.length} 个分镜的渲染任务...`);
+            const res = await fetch('/api/pipeline-execute', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ idea, advanced })
+                body: JSON.stringify({ scenes: validScenes })
             });
-
-            if (!initRes.ok) {
-                const err = await initRes.json();
-                throw new Error(err.error || 'Pipeline init failed');
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.error || '执行失败');
             }
-
-            const { scenes: initialScenes } = await initRes.json();
-            setScenes(initialScenes);
-            addLog(`✅ 脚本生成完成！共 ${initialScenes.length} 个分镜场景`);
-            initialScenes.forEach((s, i) => {
-                addLog(`   Scene ${i + 1} [${s.scene_label}]: ${s.tts_text}`);
-            });
-
-            // STEP 2: Poll Luma renders
+            const { scenes: enriched } = await res.json();
+            setScenes(enriched);
+            addLog(`✅ Luma 任务已提交，配音已生成！`);
             setCurrentStep('luma');
-            const finalScenes = await pollScenes(initialScenes);
-
-            // STEP 3: Stitch
-            addLog('所有场景渲染完成，开始视频剪辑...');
+            const finalScenes = await pollScenes(enriched);
             const outputUrl = await stitchVideos(finalScenes);
             setFinalVideoUrl(outputUrl);
             setCurrentStep('done');
             addLog('🎬 视频生成完毕！');
-
         } catch (err) {
             setError(err.message);
             setCurrentStep('error');
             addLog(`❌ 错误: ${err.message}`);
         }
-    }, [idea, advanced, addLog]);
+    };
 
-    useEffect(() => {
-        if (!hasStarted.current) {
-            hasStarted.current = true;
-            runPipeline();
-        }
-    }, [runPipeline]);
-
-    const steps = [
-        { id: 'script', label: lang === 'zh' ? '脚本 & 分镜' : 'Script & Storyboard' },
-        { id: 'luma', label: lang === 'zh' ? 'Luma 多镜头渲染' : 'Multi-Scene Rendering' },
-        { id: 'stitch', label: lang === 'zh' ? '剪辑 & 字幕' : 'Edit & Subtitles' },
-        { id: 'done', label: lang === 'zh' ? '完成导出' : 'Export Done' },
-    ];
-
-    const stepOrder = ['script', 'luma', 'stitch', 'done'];
+    const stepOrder = ['tts_luma', 'luma', 'stitch', 'done'];
     const currentStepIndex = stepOrder.indexOf(currentStep);
+
+    const allScenesHaveText = scenes.every(s => s.tts_text.trim().length > 0);
+
+    // ============== PLAN PHASE UI ==============
+    if (phase === 'plan') {
+        return (
+            <div className="glass-panel animate-fade-in" style={{ width: '100%' }}>
+                {/* Header */}
+                <div className="flex justify-between items-center mb-6">
+                    <div>
+                        <h2 className="card-title m-0" style={{ fontSize: '1.3rem' }}>
+                            <Film size={20} style={{ display: 'inline', marginRight: '0.7rem', color: 'var(--accent-primary)' }} />
+                            {lang === 'zh' ? '🎬 视频导演模式 — 分镜编辑器' : '🎬 Director Mode — Storyboard Editor'}
+                        </h2>
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginTop: '0.25rem' }}>
+                            {lang === 'zh' ? '自定义分镜数量，手动输入配音脚本，或让 AI 一键填充' : 'Set scene count, write scripts manually, or let AI fill them in'}
+                        </p>
+                    </div>
+                    {onClose && <button className="btn-secondary" onClick={onClose} style={{ fontSize: '0.8rem' }}>✕</button>}
+                </div>
+
+                {/* Scene Count Selector */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem', padding: '1rem 1.25rem', background: 'rgba(255,255,255,0.02)', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    <div>
+                        <div style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: '0.95rem' }}>
+                            {lang === 'zh' ? '分镜数量' : 'Scene Count'}
+                        </div>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', marginTop: '2px' }}>
+                            {lang === 'zh' ? `建议 3 个分镜（2-${MAX_SCENES} 可选）` : `Recommend 3 scenes (${MIN_SCENES}-${MAX_SCENES} available)`}
+                        </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                        <button
+                            onClick={() => adjustSceneCount(-1)}
+                            disabled={sceneCount <= MIN_SCENES}
+                            style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', cursor: sceneCount <= MIN_SCENES ? 'not-allowed' : 'pointer', opacity: sceneCount <= MIN_SCENES ? 0.4 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', transition: 'all 0.2s' }}
+                        ><Minus size={16} /></button>
+                        <span style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--accent-primary)', minWidth: '2rem', textAlign: 'center' }}>{sceneCount}</span>
+                        <button
+                            onClick={() => adjustSceneCount(1)}
+                            disabled={sceneCount >= MAX_SCENES}
+                            style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', cursor: sceneCount >= MAX_SCENES ? 'not-allowed' : 'pointer', opacity: sceneCount >= MAX_SCENES ? 0.4 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}
+                        ><Plus size={16} /></button>
+                    </div>
+                </div>
+
+                {/* AI Fill All Button */}
+                <div style={{ marginBottom: '1.5rem' }}>
+                    <button
+                        onClick={aiAutoFillAll}
+                        disabled={scenes.some(s => s.ai_filling)}
+                        className="btn-secondary"
+                        style={{ width: '100%', justifyContent: 'center', background: 'linear-gradient(135deg, rgba(139,92,246,0.15), rgba(59,130,246,0.1))', border: '1px solid rgba(139,92,246,0.3)', padding: '0.85rem', borderRadius: '12px', fontSize: '0.9rem', fontWeight: 600 }}
+                    >
+                        {scenes.some(s => s.ai_filling) ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <Sparkles size={16} />}
+                        {lang === 'zh' ? 'AI 一键生成全部分镜脚本' : 'AI Auto-Generate All Scene Scripts'}
+                    </button>
+                </div>
+
+                {/* Scene Cards */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginBottom: '2rem' }}>
+                    {scenes.map((scene, i) => (
+                        <div key={scene.scene_id} style={{ padding: '1.25rem', borderRadius: '14px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', position: 'relative' }}>
+                            {/* Scene Header */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                    <div style={{ background: 'linear-gradient(135deg, var(--accent-primary), #3b82f6)', color: 'white', width: '28px', height: '28px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', fontWeight: 800 }}>
+                                        {i + 1}
+                                    </div>
+                                    <div>
+                                        <span style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.9rem' }}>{scene.scene_label_zh}</span>
+                                        <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', marginLeft: '0.5rem' }}>({scene.scene_label})</span>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => aiAutoFillScene(i)}
+                                    disabled={scene.ai_filling}
+                                    className="btn-secondary"
+                                    style={{ fontSize: '0.75rem', padding: '0.35rem 0.75rem', opacity: scene.ai_filling ? 0.6 : 1 }}
+                                >
+                                    {scene.ai_filling ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Sparkles size={12} />}
+                                    {lang === 'zh' ? 'AI 填充' : 'AI Fill'}
+                                </button>
+                            </div>
+
+                            {/* TTS Script Input */}
+                            <div style={{ marginBottom: '0.75rem' }}>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.4rem', fontWeight: 600 }}>
+                                    <Mic size={11} />
+                                    {lang === 'zh' ? '配音旁白文案' : 'Voiceover Script'}
+                                    <span style={{ marginLeft: 'auto', color: scene.tts_text.length > 20 ? '#f59e0b' : 'var(--text-secondary)' }}>
+                                        {scene.tts_text.length}/25 字
+                                    </span>
+                                </label>
+                                <textarea
+                                    className="magic-input"
+                                    value={scene.tts_text}
+                                    onChange={e => updateScene(i, 'tts_text', e.target.value.slice(0, 35))}
+                                    placeholder={lang === 'zh' ? `例：每年60万学生选择留学英国！` : 'e.g., 600k students go to UK each year!'}
+                                    style={{ minHeight: '60px', fontSize: '0.9rem', padding: '0.7rem', background: 'rgba(0,0,0,0.2)', borderRadius: '10px', resize: 'vertical' }}
+                                />
+                            </div>
+
+                            {/* Luma Visual Prompt (collapsible) */}
+                            <div>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.4rem', fontWeight: 600 }}>
+                                    <Film size={11} />
+                                    {lang === 'zh' ? '画面描述（可选，留空则由AI自动生成）' : 'Visual Description (optional, AI will generate if empty)'}
+                                </label>
+                                <textarea
+                                    className="magic-input"
+                                    value={scene.luma_prompt}
+                                    onChange={e => updateScene(i, 'luma_prompt', e.target.value)}
+                                    placeholder={lang === 'zh' ? '留空即可，AI 会根据脚本自动生成最优画面提示词...' : 'Leave blank — AI will generate the optimal visual prompt from your script...'}
+                                    style={{ minHeight: '55px', fontSize: '0.8rem', padding: '0.65rem', background: 'rgba(0,0,0,0.15)', borderRadius: '10px', color: 'var(--text-secondary)', resize: 'vertical' }}
+                                />
+                            </div>
+
+                            {/* Completion indicator */}
+                            {scene.tts_text.trim() && (
+                                <div style={{ position: 'absolute', top: '1rem', right: scene.ai_filling ? '6rem' : '1rem', display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.7rem', color: '#10b981' }}>
+                                    {!scene.ai_filling && <><CheckCircle2 size={12} /> 已填写</>}
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                </div>
+
+                {/* Launch Button */}
+                <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                    <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                        {allScenesHaveText
+                            ? <span style={{ color: '#10b981' }}>✅ {lang === 'zh' ? `${scenes.length} 个分镜已就绪，可以开始渲染` : `${scenes.length} scenes ready to render`}</span>
+                            : <span style={{ color: '#f59e0b' }}>⚠️ {lang === 'zh' ? '请确保每个分镜都有配音脚本' : 'All scenes need a voiceover script'}</span>
+                        }
+                    </div>
+                    <button
+                        className="btn-primary"
+                        onClick={runPipeline}
+                        disabled={!allScenesHaveText}
+                        style={{ opacity: allScenesHaveText ? 1 : 0.4, cursor: allScenesHaveText ? 'pointer' : 'not-allowed', gap: '0.6rem' }}
+                    >
+                        <Film size={18} />
+                        {lang === 'zh' ? '开始生成视频' : 'Start Rendering'}
+                        <ArrowRight size={16} />
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    // ============== EXECUTE PHASE UI ==============
+    const steps = [
+        { id: 'tts_luma', label: lang === 'zh' ? '配音 + 触发渲染' : 'TTS + Fire Renders' },
+        { id: 'luma', label: lang === 'zh' ? 'Luma 多镜头渲染' : 'Multi-Scene Rendering' },
+        { id: 'stitch', label: lang === 'zh' ? '剪辑 + 拼接' : 'Edit & Stitch' },
+        { id: 'done', label: lang === 'zh' ? '导出完成' : 'Export Done' },
+    ];
 
     return (
         <div className="glass-panel animate-fade-in" style={{ width: '100%' }}>
-            {/* Header */}
-            <div className="flex justify-between items-center mb-8">
-                <div>
-                    <h2 className="card-title m-0" style={{ color: 'var(--accent-primary)' }}>
-                        <Film size={22} style={{ display: 'inline', marginRight: '0.8rem' }} />
-                        {lang === 'zh' ? '🎬 AI 视频导演模式' : '🎬 AI Video Director Mode'}
-                    </h2>
-                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '0.25rem' }}>
-                        脚本 → 配音 → 分镜 → Luma 渲染 → 剪辑 → 9:16 竖版导出
-                    </p>
-                </div>
-                {onClose && (
-                    <button className="btn-secondary" onClick={onClose} style={{ fontSize: '0.8rem' }}>
-                        ✕ {lang === 'zh' ? '关闭' : 'Close'}
-                    </button>
-                )}
+            <div className="flex justify-between items-center mb-6">
+                <h2 className="card-title m-0" style={{ fontSize: '1.2rem' }}>
+                    <Film size={18} style={{ display: 'inline', marginRight: '0.7rem', color: 'var(--accent-primary)' }} />
+                    {lang === 'zh' ? '🎬 正在生成您的视频...' : '🎬 Rendering Your Video...'}
+                </h2>
+                {onClose && <button className="btn-secondary" onClick={onClose} style={{ fontSize: '0.8rem' }}>✕</button>}
             </div>
 
             {/* Step Tracker */}
-            <div className="flex gap-2 mb-8" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '1.5rem', overflowX: 'auto' }}>
+            <div className="flex gap-2 mb-6" style={{ overflowX: 'auto', paddingBottom: '0.5rem' }}>
                 {steps.map((step, i) => {
                     const isActive = currentStep === step.id;
                     const isDone = currentStepIndex > i;
-                    const isError = currentStep === 'error' && i === (currentStepIndex >= 0 ? currentStepIndex : 0);
                     return (
-                        <div key={step.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
-                            <div style={{
-                                display: 'flex', alignItems: 'center', gap: '0.5rem',
-                                padding: '0.5rem 1rem', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 600,
-                                background: isDone ? 'rgba(16,185,129,0.15)' : isActive ? 'rgba(139,92,246,0.2)' : 'rgba(255,255,255,0.03)',
-                                color: isDone ? '#10b981' : isActive ? 'var(--accent-primary)' : 'var(--text-secondary)',
-                                border: `1px solid ${isDone ? 'rgba(16,185,129,0.3)' : isActive ? 'rgba(139,92,246,0.4)' : 'rgba(255,255,255,0.08)'}`,
-                                transition: 'all 0.3s ease'
-                            }}>
-                                {isDone ? <CheckCircle2 size={13} /> : isActive ? <Loader2 size={13} className="spin" style={{ animation: 'spin 1s linear infinite' }} /> : <div style={{ width: '13px', height: '13px', borderRadius: '50%', background: 'rgba(255,255,255,0.15)' }} />}
+                        <div key={step.id} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 0.85rem', borderRadius: '20px', fontSize: '0.78rem', fontWeight: 600, background: isDone ? 'rgba(16,185,129,0.15)' : isActive ? 'rgba(139,92,246,0.2)' : 'rgba(255,255,255,0.03)', color: isDone ? '#10b981' : isActive ? 'var(--accent-primary)' : 'var(--text-secondary)', border: `1px solid ${isDone ? 'rgba(16,185,129,0.3)' : isActive ? 'rgba(139,92,246,0.4)' : 'rgba(255,255,255,0.08)'}` }}>
+                                {isDone ? <CheckCircle2 size={12} /> : isActive ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: 'rgba(255,255,255,0.15)' }} />}
                                 {step.label}
                             </div>
-                            {i < steps.length - 1 && (
-                                <ChevronRight size={13} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
-                            )}
+                            {i < steps.length - 1 && <ChevronRight size={12} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />}
                         </div>
                     );
                 })}
             </div>
 
-            {/* Scene Cards */}
-            {scenes.length > 0 && (
-                <div style={{ marginBottom: '2rem' }}>
-                    <h4 style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1rem', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-                        {lang === 'zh' ? '分镜场景' : 'Storyboard Scenes'}
-                    </h4>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '1rem' }}>
-                        {scenes.map((scene, i) => (
-                            <div key={scene.scene_id} style={{
-                                padding: '1rem', borderRadius: '12px',
-                                background: scene.status === 'completed' ? 'rgba(16,185,129,0.05)' : scene.status === 'failed' ? 'rgba(239,68,68,0.05)' : 'rgba(255,255,255,0.02)',
-                                border: `1px solid ${scene.status === 'completed' ? 'rgba(16,185,129,0.2)' : scene.status === 'failed' ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.06)'}`,
-                                transition: 'all 0.3s ease'
-                            }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--accent-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                        Scene {scene.scene_id} · {scene.scene_label}
-                                    </span>
-                                    {scene.status === 'completed' ? <CheckCircle2 size={14} color="#10b981" /> :
-                                        scene.status === 'failed' ? <AlertCircle size={14} color="#ef4444" /> :
-                                            <Loader2 size={14} color="var(--accent-primary)" style={{ animation: 'spin 1s linear infinite' }} />}
-                                </div>
-                                <p style={{ fontSize: '0.9rem', color: 'var(--text-primary)', lineHeight: 1.5, margin: 0 }}>
-                                    {scene.tts_text}
-                                </p>
-                                {scene.tts_audio && (
-                                    <div style={{ marginTop: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', color: '#10b981' }}>
-                                        <Mic size={11} />
-                                        {lang === 'zh' ? '配音就绪' : 'Voiceover Ready'}
-                                    </div>
-                                )}
-                            </div>
-                        ))}
+            {/* Scene Status Cards */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.85rem', marginBottom: '1.5rem' }}>
+                {scenes.map((scene, i) => (
+                    <div key={scene.scene_id} style={{ padding: '0.85rem', borderRadius: '12px', background: scene.status === 'completed' ? 'rgba(16,185,129,0.07)' : scene.status === 'failed' ? 'rgba(239,68,68,0.07)' : 'rgba(255,255,255,0.02)', border: `1px solid ${scene.status === 'completed' ? 'rgba(16,185,129,0.2)' : scene.status === 'failed' ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.06)'}`, transition: 'all 0.3s' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                            <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--accent-primary)', textTransform: 'uppercase' }}>Scene {i + 1}</span>
+                            {scene.status === 'completed' ? <CheckCircle2 size={13} color="#10b981" /> : scene.status === 'failed' ? <AlertCircle size={13} color="#ef4444" /> : <Loader2 size={13} color="var(--accent-primary)" style={{ animation: 'spin 1s linear infinite' }} />}
+                        </div>
+                        <p style={{ fontSize: '0.82rem', color: 'var(--text-primary)', lineHeight: 1.4, margin: '0 0 0.4rem 0' }}>{scene.tts_text}</p>
+                        {scene.tts_audio && <div style={{ fontSize: '0.7rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '0.3rem' }}><Mic size={10} />配音就绪</div>}
                     </div>
-                </div>
-            )}
+                ))}
+            </div>
 
-            {/* Final Video Output */}
+            {/* Final Video */}
             {finalVideoUrl && (
-                <div style={{ marginBottom: '2rem', textAlign: 'center', animation: 'fadeIn 0.5s ease' }}>
-                    <h4 style={{ color: '#10b981', marginBottom: '1rem' }}>🎬 {lang === 'zh' ? '您的视频已准备好！' : 'Your Video Is Ready!'}</h4>
-                    <video
-                        src={finalVideoUrl}
-                        controls
-                        autoPlay
-                        style={{ maxWidth: '320px', maxHeight: '570px', borderRadius: '16px', border: '2px solid rgba(16,185,129,0.3)', display: 'block', margin: '0 auto' }}
-                    />
-                    <a
-                        href={finalVideoUrl}
-                        download="easymake_video.mp4"
-                        className="btn-primary"
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', marginTop: '1.5rem', textDecoration: 'none' }}
-                    >
-                        <Download size={18} />
-                        {lang === 'zh' ? '下载 9:16 视频' : 'Download 9:16 Video'}
+                <div style={{ textAlign: 'center', marginBottom: '1.5rem', animation: 'fadeIn 0.5s ease' }}>
+                    <h4 style={{ color: '#10b981', marginBottom: '1rem' }}>🎬 视频已生成！</h4>
+                    <video src={finalVideoUrl} controls autoPlay style={{ maxWidth: '300px', maxHeight: '533px', borderRadius: '16px', border: '2px solid rgba(16,185,129,0.3)', display: 'block', margin: '0 auto' }} />
+                    <a href={finalVideoUrl} download="easymake_director.mp4" className="btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', marginTop: '1.25rem', textDecoration: 'none' }}>
+                        <Download size={16} />
+                        下载 9:16 竖版视频
                     </a>
                 </div>
             )}
 
             {/* Error */}
             {error && (
-                <div style={{ padding: '1rem 1.25rem', background: 'rgba(239,68,68,0.08)', borderRadius: '12px', border: '1px solid rgba(239,68,68,0.2)', marginBottom: '1.5rem', display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}>
-                    <AlertCircle size={18} color="#ef4444" style={{ flexShrink: 0, marginTop: '2px' }} />
-                    <div>
-                        <p style={{ color: '#ef4444', fontWeight: 600, marginBottom: '0.25rem' }}>Pipeline Error</p>
-                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0 }}>{error}</p>
-                    </div>
+                <div style={{ padding: '0.85rem 1rem', background: 'rgba(239,68,68,0.08)', borderRadius: '12px', border: '1px solid rgba(239,68,68,0.2)', marginBottom: '1rem', display: 'flex', gap: '0.6rem' }}>
+                    <AlertCircle size={16} color="#ef4444" style={{ flexShrink: 0, marginTop: '2px' }} />
+                    <div><p style={{ color: '#ef4444', fontWeight: 600, margin: '0 0 0.2rem' }}>错误</p><p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', margin: 0 }}>{error}</p></div>
                 </div>
             )}
 
-            {/* Process Log */}
-            <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '12px', padding: '1rem', fontFamily: 'monospace', fontSize: '0.75rem', maxHeight: '200px', overflowY: 'auto', border: '1px solid rgba(255,255,255,0.05)' }}>
-                <p style={{ color: 'var(--accent-primary)', marginBottom: '0.5rem', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Process Log</p>
-                {log.length === 0 ? (
-                    <p style={{ color: 'var(--text-secondary)' }}>Initializing pipeline...</p>
-                ) : (
-                    log.map((entry, i) => (
-                        <div key={i} style={{ color: entry.includes('❌') ? '#ef4444' : entry.includes('✅') || entry.includes('🎬') ? '#10b981' : 'var(--text-secondary)', lineHeight: 1.6 }}>
-                            {entry}
-                        </div>
-                    ))
-                )}
+            {/* Log */}
+            <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '10px', padding: '0.85rem', fontFamily: 'monospace', fontSize: '0.72rem', maxHeight: '160px', overflowY: 'auto', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <p style={{ color: 'var(--accent-primary)', marginBottom: '0.4rem', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Pipeline Log</p>
+                {log.map((entry, i) => (
+                    <div key={i} style={{ color: entry.includes('❌') ? '#ef4444' : entry.includes('✅') || entry.includes('🎬') ? '#10b981' : 'var(--text-secondary)', lineHeight: 1.6 }}>{entry}</div>
+                ))}
             </div>
         </div>
     );
