@@ -362,7 +362,7 @@ function App() {
             <Globe size={16} />
             <span style={{ fontFamily: 'Inter', fontWeight: 600 }}>{t.langCode}</span>
           </button>
-          <button className="btn-secondary">{t.dashboard}</button>
+          <button className="btn-secondary hide-on-mobile">{t.dashboard}</button>
           <div className="avatar">EM</div>
         </div>
       </nav>
@@ -407,7 +407,7 @@ function App() {
 
               {showAdvanced && (
                 <div style={{ marginTop: '1.5rem', display: 'grid', gridTemplateColumns: '1fr', gap: '1rem', animation: 'fadeIn 0.3s ease' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div className="grid-2-col">
                     <div className="flex-col flex gap-2">
                       <label style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>{t.tones}</label>
                       <input className="magic-input" style={{ fontSize: '0.95rem', padding: '0.8rem', minHeight: 'auto', borderRadius: '12px', background: 'rgba(0,0,0,0.2)' }} placeholder={t.tonesPlaceholder} value={advancedArgs.tones} onChange={e => setAdvancedArgs({ ...advancedArgs, tones: e.target.value })} />
@@ -428,7 +428,7 @@ function App() {
                     </div>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div className="grid-2-col">
                     <div className="flex-col flex gap-2">
                       <label style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>{t.bgInfo}</label>
                       <input className="magic-input" style={{ fontSize: '0.95rem', padding: '0.8rem', minHeight: 'auto', borderRadius: '12px', background: 'rgba(0,0,0,0.2)' }} placeholder={t.bgInfoPlaceholder} value={advancedArgs.bgInfo} onChange={e => setAdvancedArgs({ ...advancedArgs, bgInfo: e.target.value })} />
@@ -439,7 +439,7 @@ function App() {
                     </div>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div className="grid-2-col">
                     {/* Feature 4: Target University Lexicon */}
                     <div className="flex-col flex gap-2">
                       <label style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>{t.targetUniv}</label>
@@ -467,7 +467,7 @@ function App() {
                     </div>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div className="grid-2-col">
                     <div className="flex-col flex gap-2">
                       <label style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>{t.cameraMove}</label>
                       <select
@@ -499,7 +499,7 @@ function App() {
                   </div>
 
                   {/* Features 2 & 3: Urgency Hooks & CTAs */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '0.5rem' }}>
+                  <div className="grid-2-col" style={{ marginTop: '0.5rem' }}>
                     <div className="flex-col flex gap-1 p-3" style={{ background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
                       <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)', fontSize: '0.875rem', cursor: 'pointer', fontWeight: 500 }}>
                         <input type="checkbox" checked={advancedArgs.urgencyHook} onChange={(e) => setAdvancedArgs({ ...advancedArgs, urgencyHook: e.target.checked })} style={{ width: '16px', height: '16px', accentColor: 'var(--accent-primary)' }} />
@@ -521,7 +521,7 @@ function App() {
               )}
             </div>
 
-            <div className="flex justify-between items-center mt-6">
+            <div className="flex justify-between items-center mt-6 flex-mobile-col">
               <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
                 {t.ideaFooter} • {t.generationsLeft} <strong style={{ color: generationsUsed >= 99 ? '#ef4444' : '#10b981' }}>{99 - generationsUsed}/99</strong>
               </span>
