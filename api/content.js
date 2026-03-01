@@ -38,7 +38,12 @@ export default async function handler(req, res) {
             }
         }
 
-        const systemPrompt = `You are a master social media copywriter and animation director for top-tier Chinese study abroad (留学) agencies. 
+        let industryName = "Study Abroad";
+        if (advanced && advanced.industry) {
+            industryName = advanced.industry;
+        }
+
+        const systemPrompt = `You are a master social media copywriter and animation director for top-tier Chinese ${industryName} brands/agencies. 
 Your goal is to take the user's input and generate three things:
 1. Highly engaging, convincing Chinese social media copy (爆款文案) tailored for platforms like Xiaohongshu (小红书), WeChat, or Douyin.
 2. A highly detailed English video generation prompt specifically engineered for the 'Luma Dream Machine Ray 2' model.

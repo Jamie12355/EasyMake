@@ -1,10 +1,94 @@
 import { useState, useEffect } from 'react';
-import { Sparkles, Wand2, Copy, Video, CheckCircle2, ArrowRight, Play, FastForward, Globe, Settings2, ChevronDown, ChevronUp, Image, Film } from 'lucide-react';
+import { Sparkles, Wand2, Copy, Video, CheckCircle2, ArrowRight, Play, FastForward, Globe, Settings2, ChevronDown, ChevronUp, Image, Film, Briefcase, ShoppingBag, Home, MapPin, Rocket } from 'lucide-react';
 import { generateContent, generateVideo, generateImage } from './api';
 import VideoPipeline from './VideoPipeline';
 import ShotstackTest from './ShotstackTest';
 import './index.css';
 import './App.css';
+
+const IND_CONFIG = {
+  study_abroad: {
+    id: "study_abroad",
+    icon: <Globe size={28} />,
+    label_zh: "留学机构",
+    label_en: "Study Abroad",
+    badge_zh: "✨ 专为留学机构打造的零摩擦内容工具",
+    badge_en: "✨ The easiest way for study abroad agencies to generate content",
+    heroSubtitle_zh: "只需输入您的想法，EasyMake 即可瞬间为您的留学机构生成引人入胜的社媒文案与高质量的介绍动画。",
+    heroSubtitle_en: "Just tell us your idea. EasyMake instantly generates engaging social media copies and high-quality animations for your education agency.",
+    ideaPlaceholder_zh: "例如：介绍我们的英国本科名校申请服务...",
+    ideaPlaceholder_en: "e.g., Introduction to our UK University application service...",
+    adv_bgInfo_zh: "例如：深耕留英10年、G5名校导师团队...",
+    adv_bgInfo_en: "e.g., 10 years experience, G5 alumni...",
+    adv_audience_zh: "例如：准备申请英国本科的高中生家长...",
+    adv_audience_en: "e.g., Parents of high school students applying to UK..."
+  },
+  ecommerce: {
+    id: "ecommerce",
+    icon: <ShoppingBag size={28} />,
+    label_zh: "电商带货",
+    label_en: "E-commerce",
+    badge_zh: "✨ 专为电商带货打造的零摩擦内容工具",
+    badge_en: "✨ The easiest way for e-commerce to generate content",
+    heroSubtitle_zh: "只需输入您的想法，EasyMake 即可瞬间为您的电商店铺生成爆款种草文案与高质量的带货动画。",
+    heroSubtitle_en: "Just tell us your idea. EasyMake instantly generates engaging social media copies and high-quality product animations.",
+    ideaPlaceholder_zh: "例如：推荐我们的新款便携榨汁机，突出续航和便携...",
+    ideaPlaceholder_en: "e.g., Recommend our new portable blender, highlight battery & size...",
+    adv_bgInfo_zh: "例如：自有工厂、三年质保、全网销量Top1...",
+    adv_bgInfo_en: "e.g., Own factory, 3-year warranty, Top seller...",
+    adv_audience_zh: "例如：注重性价比的学生党和年轻上班族...",
+    adv_audience_en: "e.g., Budget-conscious students and young professionals..."
+  },
+  real_estate: {
+    id: "real_estate",
+    icon: <Home size={28} />,
+    label_zh: "房产营销",
+    label_en: "Real Estate",
+    badge_zh: "✨ 专为房产营销打造的零摩擦内容工具",
+    badge_en: "✨ The easiest way for real estate to generate content",
+    heroSubtitle_zh: "只需输入您的想法，EasyMake 即可瞬间为您的房产项目生成吸睛文案与极具奢华感的看房动画。",
+    heroSubtitle_en: "Just tell us your idea. EasyMake instantly generates engaging social media copies and luxurious property tour animations.",
+    ideaPlaceholder_zh: "例如：介绍市中心的豪华海景大平层，强调无遮挡视野...",
+    ideaPlaceholder_en: "e.g., Introducing a luxury ocean-view penthouse downtown...",
+    adv_bgInfo_zh: "例如：世界500强开发商、金牌物业...",
+    adv_bgInfo_en: "e.g., Top 500 developer, premium property management...",
+    adv_audience_zh: "例如：寻找改善型住房的高净值人群...",
+    adv_audience_en: "e.g., High net-worth individuals looking for luxury homes..."
+  },
+  local_service: {
+    id: "local_service",
+    icon: <MapPin size={28} />,
+    label_zh: "本地生活",
+    label_en: "Local Services",
+    badge_zh: "✨ 专为本地生活服务打造的零摩擦内容工具",
+    badge_en: "✨ The easiest way for local businesses to generate content",
+    heroSubtitle_zh: "只需输入您的想法，EasyMake 即可瞬间为您的门店生成同城引流文案与探店动画。",
+    heroSubtitle_en: "Just tell us your idea. EasyMake instantly generates engaging local promos and store-tour animations.",
+    ideaPlaceholder_zh: "例如：新开业的日式烧肉店周末双人套餐特惠...",
+    ideaPlaceholder_en: "e.g., Grand opening of our Japanese BBQ weekend set meal...",
+    adv_bgInfo_zh: "例如：大众点评必吃榜、全城仅此一家...",
+    adv_bgInfo_en: "e.g., Top rated on Yelp, exclusive local dining...",
+    adv_audience_zh: "例如：喜欢打卡美食的年轻情侣...",
+    adv_audience_en: "e.g., Foodies and young couples..."
+  },
+  tech_startup: {
+    id: "tech_startup",
+    icon: <Rocket size={28} />,
+    label_zh: "科技创业",
+    label_en: "Tech Startup",
+    badge_zh: "✨ 专为科技创业打造的零摩擦内容工具",
+    badge_en: "✨ The easiest way for tech startups to generate content",
+    heroSubtitle_zh: "只需输入您的想法，EasyMake 即可瞬间为您的科技产品生成极具未来感的发布文案与演示动画。",
+    heroSubtitle_en: "Just tell us your idea. EasyMake instantly generates engaging futuristic product launch copies and demo animations.",
+    ideaPlaceholder_zh: "例如：发布我们全新的AI智能健康检测戒指...",
+    ideaPlaceholder_en: "e.g., Launching our new AI smart health tracking ring...",
+    adv_bgInfo_zh: "例如：硅谷研发团队、获得千万美元融资...",
+    adv_bgInfo_en: "e.g., Silicon Valley based, backed by top VCs...",
+    adv_audience_zh: "例如：热爱科技尝鲜的数码极客...",
+    adv_audience_en: "e.g., Tech geeks and early adopters..."
+  }
+};
+
 
 
 const i18n = {
@@ -171,6 +255,8 @@ function App() {
   if (window.location.pathname === '/shotstack-test') return <ShotstackTest />;
 
   const [lang, setLang] = useState("zh");
+  const [industry, setIndustry] = useState("study_abroad");
+  const [appStarted, setAppStarted] = useState(false);
   const [idea, setIdea] = useState("");
   const [status, setStatus] = useState("idle");
   const [result, setResult] = useState(null);
@@ -234,7 +320,8 @@ function App() {
 
     try {
       // 1. Generate text and video prompt via DeepSeek
-      const llmResult = await generateContent({ idea, advanced: advancedArgs });
+      const industryName = lang === 'zh' ? IND_CONFIG[industry].label_zh : IND_CONFIG[industry].label_en;
+      const llmResult = await generateContent({ idea, advanced: { ...advancedArgs, industry: industryName } });
 
       // We can show the text result immediately while the video is still generating!
       setResult({
@@ -468,245 +555,295 @@ function App() {
       </nav>
 
       <main className="app-main">
-        {status === 'idle' && (
-          <div className="hero-section">
-            <div className="hero-badge">
-              {t.badge}
-            </div>
-            <h1 className="hero-title pt-4">
-              {t.heroTitle} <br />
-              <h1-gradient>{t.heroHighlight}</h1-gradient>
+        {!appStarted ? (
+          <div className="animate-fade-in" style={{ maxWidth: '1000px', margin: '0 auto', paddingTop: '4rem', paddingBottom: '4rem', textAlign: 'center' }}>
+            <h1 style={{ fontSize: '3.8rem', fontWeight: 800, marginBottom: '1.5rem', background: 'linear-gradient(135deg, #fff, #94a3b8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', lineHeight: 1.1 }}>
+              {lang === 'zh' ? '用 AI 引爆下一篇内容。' : 'Ignite Your Content with AI.'}
             </h1>
-            <p className="hero-subtitle">
-              {t.heroSubtitle}
+            <p style={{ fontSize: '1.2rem', color: 'var(--text-secondary)', marginBottom: '4rem', maxWidth: '600px', margin: '0 auto' }}>
+              {lang === 'zh' ? '极简设计搭配强大的 Luma 视频底部引擎。不仅是排版，首先挑选您所在的行业，我们将为您定制专用的核心指令。' : 'Minimalist design powered by the ultimate Luma engine. First, select your industry.'}
             </p>
-          </div>
-        )}
 
-        {status === 'idle' && (
-          <div className="glass-panel mx-auto relative z-10">
-            <h2 className="card-title mb-4 pt-4">{t.ideaTitle}</h2>
-            <textarea
-              className="magic-input"
-              style={{ minHeight: '150px' }}
-              placeholder={t.ideaPlaceholder}
-              value={idea}
-              onChange={(e) => setIdea(e.target.value)}
-            />
-
-            <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--text-primary)', fontSize: '0.9rem', cursor: 'pointer', fontWeight: 500, background: 'rgba(255,255,255,0.03)', padding: '0.8rem 1.2rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                <input
-                  type="checkbox"
-                  checked={generateTextEnabled}
-                  onChange={(e) => setGenerateTextEnabled(e.target.checked)}
-                  style={{ width: '18px', height: '18px', accentColor: 'var(--accent-primary)', cursor: 'pointer' }}
-                />
-                {t.genTextLabel}
-              </label>
-
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--text-primary)', fontSize: '0.9rem', cursor: 'pointer', fontWeight: 500, background: 'rgba(255,255,255,0.03)', padding: '0.8rem 1.2rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                <input
-                  type="checkbox"
-                  checked={generateImageEnabled}
-                  onChange={(e) => setGenerateImageEnabled(e.target.checked)}
-                  style={{ width: '18px', height: '18px', accentColor: 'var(--accent-primary)', cursor: 'pointer' }}
-                />
-                {t.genImageLabel}
-              </label>
-
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--text-primary)', fontSize: '0.9rem', cursor: 'pointer', fontWeight: 500, background: 'rgba(255,255,255,0.03)', padding: '0.8rem 1.2rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                <input
-                  type="checkbox"
-                  checked={generateVideoEnabled}
-                  onChange={(e) => setGenerateVideoEnabled(e.target.checked)}
-                  style={{ width: '18px', height: '18px', accentColor: 'var(--accent-primary)', cursor: 'pointer' }}
-                />
-                {t.genVideoLabel}
-              </label>
-            </div>
-
-            <div style={{ marginTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1.5rem' }}>
-              <button
-                onClick={() => setShowAdvanced(!showAdvanced)}
-                className="btn-secondary"
-                style={{ background: 'transparent', border: 'none', padding: 0, color: 'var(--text-secondary)', fontSize: '0.9rem' }}
-              >
-                <Settings2 size={16} />
-                {t.advancedSettings}
-                {showAdvanced ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-              </button>
-
-              {showAdvanced && (
-                <div style={{ marginTop: '1.5rem', display: 'grid', gridTemplateColumns: '1fr', gap: '1rem', animation: 'fadeIn 0.3s ease' }}>
-                  <div className="grid-2-col">
-                    <div className="flex-col flex gap-2">
-                      <label style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>{t.tones}</label>
-                      <input className="magic-input" style={{ fontSize: '0.95rem', padding: '0.8rem', minHeight: 'auto', borderRadius: '12px', background: 'rgba(0,0,0,0.2)' }} placeholder={t.tonesPlaceholder} value={advancedArgs.tones} onChange={e => setAdvancedArgs({ ...advancedArgs, tones: e.target.value })} />
-                    </div>
-                    <div className="flex-col flex gap-2">
-                      <label style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>{t.animPref}</label>
-                      <select
-                        className="magic-input"
-                        style={{ fontSize: '0.95rem', padding: '0.8rem', minHeight: 'auto', borderRadius: '12px', background: 'rgba(0,0,0,0.2)' }}
-                        value={advancedArgs.animPref}
-                        onChange={e => setAdvancedArgs({ ...advancedArgs, animPref: e.target.value })}
-                      >
-                        <option value="" style={{ color: 'black' }}>{t.animPrefOption1}</option>
-                        <option value="Mixed Media Collage Style, Stop-motion" style={{ color: 'black' }}>{t.animPrefOption2}</option>
-                        <option value="Cinematic Photorealism, High Fidelity" style={{ color: 'black' }}>{t.animPrefOption3}</option>
-                        <option value="3D Pixar Cartoon Style" style={{ color: 'black' }}>{t.animPrefOption4}</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="grid-2-col">
-                    <div className="flex-col flex gap-2">
-                      <label style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>{t.bgInfo}</label>
-                      <input className="magic-input" style={{ fontSize: '0.95rem', padding: '0.8rem', minHeight: 'auto', borderRadius: '12px', background: 'rgba(0,0,0,0.2)' }} placeholder={t.bgInfoPlaceholder} value={advancedArgs.bgInfo} onChange={e => setAdvancedArgs({ ...advancedArgs, bgInfo: e.target.value })} />
-                    </div>
-                    <div className="flex-col flex gap-2">
-                      <label style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>{t.audience}</label>
-                      <input className="magic-input" style={{ fontSize: '0.95rem', padding: '0.8rem', minHeight: 'auto', borderRadius: '12px', background: 'rgba(0,0,0,0.2)' }} placeholder={t.audiencePlaceholder} value={advancedArgs.audience} onChange={e => setAdvancedArgs({ ...advancedArgs, audience: e.target.value })} />
-                    </div>
-                  </div>
-
-                  <div className="grid-2-col">
-                    {/* Feature 4: Target University Lexicon */}
-                    <div className="flex-col flex gap-2">
-                      <label style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>{t.targetUniv}</label>
-                      <select
-                        className="magic-input"
-                        style={{ fontSize: '0.95rem', padding: '0.8rem', minHeight: 'auto', borderRadius: '12px', background: 'rgba(0,0,0,0.2)' }}
-                        value={advancedArgs.targetUniv}
-                        onChange={e => setAdvancedArgs({ ...advancedArgs, targetUniv: e.target.value })}
-                      >
-                        <option value="" style={{ color: 'black' }}>{t.targetUnivOption1}</option>
-                        <option value="g5" style={{ color: 'black' }}>{t.targetUnivOption2}</option>
-                        <option value="kmwe" style={{ color: 'black' }}>{t.targetUnivOption3}</option>
-                        <option value="go8" style={{ color: 'black' }}>{t.targetUnivOption4}</option>
-                        <option value="ivy" style={{ color: 'black' }}>{t.targetUnivOption5}</option>
-                        <option value="qs50" style={{ color: 'black' }}>{t.targetUnivOption6}</option>
-                        <option value="business" style={{ color: 'black' }}>{t.targetUnivOption7}</option>
-                        <option value="art" style={{ color: 'black' }}>{t.targetUnivOption8}</option>
-                        <option value="hksg" style={{ color: 'black' }}>{t.targetUnivOption9}</option>
-                      </select>
-                    </div>
-
-                    <div className="flex-col flex gap-2">
-                      <label style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>{t.response}</label>
-                      <input className="magic-input" style={{ fontSize: '0.95rem', padding: '0.8rem', minHeight: 'auto', borderRadius: '12px', background: 'rgba(0,0,0,0.2)' }} placeholder={t.responsePlaceholder} value={advancedArgs.response} onChange={e => setAdvancedArgs({ ...advancedArgs, response: e.target.value })} />
-                    </div>
-                  </div>
-
-                  <div className="grid-2-col">
-                    <div className="flex-col flex gap-2">
-                      <label style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>{t.cameraMove}</label>
-                      <select
-                        className="magic-input"
-                        style={{ fontSize: '0.95rem', padding: '0.8rem', minHeight: 'auto', borderRadius: '12px', background: 'rgba(0,0,0,0.2)' }}
-                        value={advancedArgs.cameraMove}
-                        onChange={e => setAdvancedArgs({ ...advancedArgs, cameraMove: e.target.value })}
-                      >
-                        <option value="" style={{ color: 'black' }}>{t.cameraMoveOption1}</option>
-                        <option value="Smooth Tracking camera shot" style={{ color: 'black' }}>{t.cameraMoveOption2}</option>
-                        <option value="Fast FPV Drone flythrough shot" style={{ color: 'black' }}>{t.cameraMoveOption3}</option>
-                        <option value="Cinematic slow Zoom In/Out" style={{ color: 'black' }}>{t.cameraMoveOption4}</option>
-                      </select>
-                    </div>
-                    <div className="flex-col flex gap-2">
-                      <label style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>{t.lighting}</label>
-                      <select
-                        className="magic-input"
-                        style={{ fontSize: '0.95rem', padding: '0.8rem', minHeight: 'auto', borderRadius: '12px', background: 'rgba(0,0,0,0.2)' }}
-                        value={advancedArgs.lighting}
-                        onChange={e => setAdvancedArgs({ ...advancedArgs, lighting: e.target.value })}
-                      >
-                        <option value="" style={{ color: 'black' }}>{t.lightingOption1}</option>
-                        <option value="Volumetric Golden Hour lighting, hazy sunrise" style={{ color: 'black' }}>{t.lightingOption2}</option>
-                        <option value="Dark Moody Cinematic lighting, soft shadows" style={{ color: 'black' }}>{t.lightingOption3}</option>
-                        <option value="Cyberpunk Neon glowing accents, highly saturated" style={{ color: 'black' }}>{t.lightingOption4}</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Features 2 & 3: Urgency Hooks & CTAs */}
-                  <div className="grid-2-col" style={{ marginTop: '0.5rem' }}>
-                    <div className="flex-col flex gap-1 p-3" style={{ background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)', fontSize: '0.875rem', cursor: 'pointer', fontWeight: 500 }}>
-                        <input type="checkbox" checked={advancedArgs.urgencyHook} onChange={(e) => setAdvancedArgs({ ...advancedArgs, urgencyHook: e.target.checked })} style={{ width: '16px', height: '16px', accentColor: 'var(--accent-primary)' }} />
-                        {t.urgencyHook}
-                      </label>
-                      <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '0 0 0 24px', lineHeight: 1.2 }}>{t.urgencyHookDesc}</p>
-                    </div>
-
-                    <div className="flex-col flex gap-1 p-3" style={{ background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)', fontSize: '0.875rem', cursor: 'pointer', fontWeight: 500 }}>
-                        <input type="checkbox" checked={advancedArgs.cta} onChange={(e) => setAdvancedArgs({ ...advancedArgs, cta: e.target.checked })} style={{ width: '16px', height: '16px', accentColor: 'var(--accent-primary)' }} />
-                        {t.cta}
-                      </label>
-                      <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '0 0 0 24px', lineHeight: 1.2 }}>{t.ctaDesc}</p>
-                    </div>
-                  </div>
-
-                </div>
-              )}
-            </div>
-
-            <div style={{ marginTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {/* Director Mode Banner */}
-              <div
-                onClick={() => idea.trim() && setPipelineMode(true)}
-                style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem',
-                  padding: '1rem 1.25rem', borderRadius: '14px', cursor: idea.trim() ? 'pointer' : 'not-allowed',
-                  background: 'linear-gradient(135deg, rgba(139,92,246,0.12), rgba(59,130,246,0.08))',
-                  border: '1px solid rgba(139,92,246,0.25)', opacity: idea.trim() ? 1 : 0.4,
-                  transition: 'all 0.2s ease'
-                }}
-                onMouseEnter={e => { if (idea.trim()) e.currentTarget.style.background = 'linear-gradient(135deg, rgba(139,92,246,0.22), rgba(59,130,246,0.15))'; }}
-                onMouseLeave={e => { e.currentTarget.style.background = 'linear-gradient(135deg, rgba(139,92,246,0.12), rgba(59,130,246,0.08))'; }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-                  <div style={{ background: 'linear-gradient(135deg, var(--accent-primary), #3b82f6)', padding: '0.6rem', borderRadius: '10px', display: 'flex' }}>
-                    <Film size={18} color="white" />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem', textAlign: 'left' }}>
+              {Object.values(IND_CONFIG).map(ind => (
+                <div
+                  key={ind.id}
+                  onClick={() => { setIndustry(ind.id); setAppStarted(true); window.scrollTo(0, 0); }}
+                  className="glass-panel"
+                  style={{
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '1.25rem',
+                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)', border: '1px solid rgba(255,255,255,0.08)', padding: '1.75rem',
+                    background: 'rgba(255,255,255,0.03)', borderRadius: '20px'
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-6px)'; e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.borderColor = 'rgba(139,92,246,0.5)'; e.currentTarget.style.boxShadow = '0 12px 30px rgba(139,92,246,0.15)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.boxShadow = 'none'; }}
+                >
+                  <div style={{ background: 'linear-gradient(135deg, var(--accent-primary), #3b82f6)', width: '56px', height: '56px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '16px', color: 'white', flexShrink: 0 }}>
+                    {ind.icon}
                   </div>
                   <div>
-                    <div style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: '0.9rem' }}>{t.directorModeBtn}</div>
-                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', marginTop: '1px' }}>{t.directorModeDesc}</div>
+                    <h3 style={{ fontSize: '1.15rem', fontWeight: 700, margin: '0 0 0.2rem 0', color: 'var(--text-primary)' }}>{ind[`label_${lang}`]}</h3>
+                    <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                      {lang === 'zh' ? '一键生成专属图文/视频' : 'Tailored texts & videos'}
+                    </p>
                   </div>
                 </div>
-                <ArrowRight size={16} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
-              </div>
-            </div>
-
-            <div className="flex justify-between items-center mt-6 flex-mobile-col">
-              <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                {t.ideaFooter} • {t.generationsLeft} <strong style={{ color: generationsUsed >= 99 ? '#ef4444' : '#10b981' }}>{99 - generationsUsed}/99</strong>
-              </span>
-              <button
-                className="btn-primary"
-                onClick={handleGenerate}
-                disabled={!idea.trim() || generationsUsed >= 99}
-                style={{ opacity: (!idea.trim() || generationsUsed >= 99) ? 0.5 : 1, cursor: (!idea.trim() || generationsUsed >= 99) ? 'not-allowed' : 'pointer' }}
-              >
-                <Wand2 size={20} />
-                {t.generateBtn}
-                <ArrowRight size={18} />
-              </button>
+              ))}
             </div>
           </div>
-        )}
+        ) : (
+          <>
+            {status === 'idle' && (
+              <div className="hero-section">
+                {/* Back button */}
+                <button
+                  onClick={() => setAppStarted(false)}
+                  style={{ position: 'absolute', top: 0, left: 0, background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem', padding: 0 }}
+                  onMouseEnter={e => e.currentTarget.style.color = 'var(--text-primary)'}
+                  onMouseLeave={e => e.currentTarget.style.color = 'var(--text-secondary)'}
+                >
+                  ← {lang === 'zh' ? '返回首页' : 'Home'}
+                </button>
+                <div className="hero-badge" style={{ marginTop: '2rem' }}>
+                  {IND_CONFIG[industry][`badge_${lang}`]}
+                </div>
+                <h1 className="hero-title pt-4">
+                  {t.heroTitle} <br />
+                  <div className="gradient-text gradient-glow" style={{ display: 'inline' }}>{t.heroHighlight}</div>
+                </h1>
+                <p className="hero-subtitle">
+                  {IND_CONFIG[industry][`heroSubtitle_${lang}`]}
+                </p>
+              </div>
+            )}
 
-        {renderStatus()}
-        {renderResult()}
+            {status === 'idle' && (
+              <div className="glass-panel mx-auto relative z-10">
+                <h2 className="card-title mb-4 pt-4">{t.ideaTitle}</h2>
+                <textarea
+                  className="magic-input"
+                  style={{ minHeight: '150px' }}
+                  placeholder={IND_CONFIG[industry][`ideaPlaceholder_${lang}`]}
+                  value={idea}
+                  onChange={(e) => setIdea(e.target.value)}
+                />
+
+                <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--text-primary)', fontSize: '0.9rem', cursor: 'pointer', fontWeight: 500, background: 'rgba(255,255,255,0.03)', padding: '0.8rem 1.2rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    <input
+                      type="checkbox"
+                      checked={generateTextEnabled}
+                      onChange={(e) => setGenerateTextEnabled(e.target.checked)}
+                      style={{ width: '18px', height: '18px', accentColor: 'var(--accent-primary)', cursor: 'pointer' }}
+                    />
+                    {t.genTextLabel}
+                  </label>
+
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--text-primary)', fontSize: '0.9rem', cursor: 'pointer', fontWeight: 500, background: 'rgba(255,255,255,0.03)', padding: '0.8rem 1.2rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    <input
+                      type="checkbox"
+                      checked={generateImageEnabled}
+                      onChange={(e) => setGenerateImageEnabled(e.target.checked)}
+                      style={{ width: '18px', height: '18px', accentColor: 'var(--accent-primary)', cursor: 'pointer' }}
+                    />
+                    {t.genImageLabel}
+                  </label>
+
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--text-primary)', fontSize: '0.9rem', cursor: 'pointer', fontWeight: 500, background: 'rgba(255,255,255,0.03)', padding: '0.8rem 1.2rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    <input
+                      type="checkbox"
+                      checked={generateVideoEnabled}
+                      onChange={(e) => setGenerateVideoEnabled(e.target.checked)}
+                      style={{ width: '18px', height: '18px', accentColor: 'var(--accent-primary)', cursor: 'pointer' }}
+                    />
+                    {t.genVideoLabel}
+                  </label>
+                </div>
+
+                <div style={{ marginTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1.5rem' }}>
+                  <button
+                    onClick={() => setShowAdvanced(!showAdvanced)}
+                    className="btn-secondary"
+                    style={{ background: 'transparent', border: 'none', padding: 0, color: 'var(--text-secondary)', fontSize: '0.9rem' }}
+                  >
+                    <Settings2 size={16} />
+                    {t.advancedSettings}
+                    {showAdvanced ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  </button>
+
+                  {showAdvanced && (
+                    <div style={{ marginTop: '1.5rem', display: 'grid', gridTemplateColumns: '1fr', gap: '1rem', animation: 'fadeIn 0.3s ease' }}>
+                      <div className="grid-2-col">
+                        <div className="flex-col flex gap-2">
+                          <label style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>{t.tones}</label>
+                          <input className="magic-input" style={{ fontSize: '0.95rem', padding: '0.8rem', minHeight: 'auto', borderRadius: '12px', background: 'rgba(0,0,0,0.2)' }} placeholder={t.tonesPlaceholder} value={advancedArgs.tones} onChange={e => setAdvancedArgs({ ...advancedArgs, tones: e.target.value })} />
+                        </div>
+                        <div className="flex-col flex gap-2">
+                          <label style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>{t.animPref}</label>
+                          <select
+                            className="magic-input"
+                            style={{ fontSize: '0.95rem', padding: '0.8rem', minHeight: 'auto', borderRadius: '12px', background: 'rgba(0,0,0,0.2)' }}
+                            value={advancedArgs.animPref}
+                            onChange={e => setAdvancedArgs({ ...advancedArgs, animPref: e.target.value })}
+                          >
+                            <option value="" style={{ color: 'black' }}>{t.animPrefOption1}</option>
+                            <option value="Mixed Media Collage Style, Stop-motion" style={{ color: 'black' }}>{t.animPrefOption2}</option>
+                            <option value="Cinematic Photorealism, High Fidelity" style={{ color: 'black' }}>{t.animPrefOption3}</option>
+                            <option value="3D Pixar Cartoon Style" style={{ color: 'black' }}>{t.animPrefOption4}</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="grid-2-col">
+                        <div className="flex-col flex gap-2">
+                          <label style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>{t.bgInfo}</label>
+                          <input className="magic-input" style={{ fontSize: '0.95rem', padding: '0.8rem', minHeight: 'auto', borderRadius: '12px', background: 'rgba(0,0,0,0.2)' }} placeholder={IND_CONFIG[industry][`adv_bgInfo_${lang}`]} value={advancedArgs.bgInfo} onChange={e => setAdvancedArgs({ ...advancedArgs, bgInfo: e.target.value })} />
+                        </div>
+                        <div className="flex-col flex gap-2">
+                          <label style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>{t.audience}</label>
+                          <input className="magic-input" style={{ fontSize: '0.95rem', padding: '0.8rem', minHeight: 'auto', borderRadius: '12px', background: 'rgba(0,0,0,0.2)' }} placeholder={IND_CONFIG[industry][`adv_audience_${lang}`]} value={advancedArgs.audience} onChange={e => setAdvancedArgs({ ...advancedArgs, audience: e.target.value })} />
+                        </div>
+                      </div>
+
+                      <div className="grid-2-col">
+                        {/* Feature 4: Target University Lexicon */}
+                        <div className="flex-col flex gap-2">
+                          <label style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>{t.targetUniv}</label>
+                          <select
+                            className="magic-input"
+                            style={{ fontSize: '0.95rem', padding: '0.8rem', minHeight: 'auto', borderRadius: '12px', background: 'rgba(0,0,0,0.2)' }}
+                            value={advancedArgs.targetUniv}
+                            onChange={e => setAdvancedArgs({ ...advancedArgs, targetUniv: e.target.value })}
+                          >
+                            <option value="" style={{ color: 'black' }}>{t.targetUnivOption1}</option>
+                            <option value="g5" style={{ color: 'black' }}>{t.targetUnivOption2}</option>
+                            <option value="kmwe" style={{ color: 'black' }}>{t.targetUnivOption3}</option>
+                            <option value="go8" style={{ color: 'black' }}>{t.targetUnivOption4}</option>
+                            <option value="ivy" style={{ color: 'black' }}>{t.targetUnivOption5}</option>
+                            <option value="qs50" style={{ color: 'black' }}>{t.targetUnivOption6}</option>
+                            <option value="business" style={{ color: 'black' }}>{t.targetUnivOption7}</option>
+                            <option value="art" style={{ color: 'black' }}>{t.targetUnivOption8}</option>
+                            <option value="hksg" style={{ color: 'black' }}>{t.targetUnivOption9}</option>
+                          </select>
+                        </div>
+
+                        <div className="flex-col flex gap-2">
+                          <label style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>{t.response}</label>
+                          <input className="magic-input" style={{ fontSize: '0.95rem', padding: '0.8rem', minHeight: 'auto', borderRadius: '12px', background: 'rgba(0,0,0,0.2)' }} placeholder={t.responsePlaceholder} value={advancedArgs.response} onChange={e => setAdvancedArgs({ ...advancedArgs, response: e.target.value })} />
+                        </div>
+                      </div>
+
+                      <div className="grid-2-col">
+                        <div className="flex-col flex gap-2">
+                          <label style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>{t.cameraMove}</label>
+                          <select
+                            className="magic-input"
+                            style={{ fontSize: '0.95rem', padding: '0.8rem', minHeight: 'auto', borderRadius: '12px', background: 'rgba(0,0,0,0.2)' }}
+                            value={advancedArgs.cameraMove}
+                            onChange={e => setAdvancedArgs({ ...advancedArgs, cameraMove: e.target.value })}
+                          >
+                            <option value="" style={{ color: 'black' }}>{t.cameraMoveOption1}</option>
+                            <option value="Smooth Tracking camera shot" style={{ color: 'black' }}>{t.cameraMoveOption2}</option>
+                            <option value="Fast FPV Drone flythrough shot" style={{ color: 'black' }}>{t.cameraMoveOption3}</option>
+                            <option value="Cinematic slow Zoom In/Out" style={{ color: 'black' }}>{t.cameraMoveOption4}</option>
+                          </select>
+                        </div>
+                        <div className="flex-col flex gap-2">
+                          <label style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>{t.lighting}</label>
+                          <select
+                            className="magic-input"
+                            style={{ fontSize: '0.95rem', padding: '0.8rem', minHeight: 'auto', borderRadius: '12px', background: 'rgba(0,0,0,0.2)' }}
+                            value={advancedArgs.lighting}
+                            onChange={e => setAdvancedArgs({ ...advancedArgs, lighting: e.target.value })}
+                          >
+                            <option value="" style={{ color: 'black' }}>{t.lightingOption1}</option>
+                            <option value="Volumetric Golden Hour lighting, hazy sunrise" style={{ color: 'black' }}>{t.lightingOption2}</option>
+                            <option value="Dark Moody Cinematic lighting, soft shadows" style={{ color: 'black' }}>{t.lightingOption3}</option>
+                            <option value="Cyberpunk Neon glowing accents, highly saturated" style={{ color: 'black' }}>{t.lightingOption4}</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Features 2 & 3: Urgency Hooks & CTAs */}
+                      <div className="grid-2-col" style={{ marginTop: '0.5rem' }}>
+                        <div className="flex-col flex gap-1 p-3" style={{ background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)', fontSize: '0.875rem', cursor: 'pointer', fontWeight: 500 }}>
+                            <input type="checkbox" checked={advancedArgs.urgencyHook} onChange={(e) => setAdvancedArgs({ ...advancedArgs, urgencyHook: e.target.checked })} style={{ width: '16px', height: '16px', accentColor: 'var(--accent-primary)' }} />
+                            {t.urgencyHook}
+                          </label>
+                          <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '0 0 0 24px', lineHeight: 1.2 }}>{t.urgencyHookDesc}</p>
+                        </div>
+
+                        <div className="flex-col flex gap-1 p-3" style={{ background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)', fontSize: '0.875rem', cursor: 'pointer', fontWeight: 500 }}>
+                            <input type="checkbox" checked={advancedArgs.cta} onChange={(e) => setAdvancedArgs({ ...advancedArgs, cta: e.target.checked })} style={{ width: '16px', height: '16px', accentColor: 'var(--accent-primary)' }} />
+                            {t.cta}
+                          </label>
+                          <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '0 0 0 24px', lineHeight: 1.2 }}>{t.ctaDesc}</p>
+                        </div>
+                      </div>
+
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ marginTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {/* Director Mode Banner */}
+                  <div
+                    onClick={() => idea.trim() && setPipelineMode(true)}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem',
+                      padding: '1rem 1.25rem', borderRadius: '14px', cursor: idea.trim() ? 'pointer' : 'not-allowed',
+                      background: 'linear-gradient(135deg, rgba(139,92,246,0.12), rgba(59,130,246,0.08))',
+                      border: '1px solid rgba(139,92,246,0.25)', opacity: idea.trim() ? 1 : 0.4,
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseEnter={e => { if (idea.trim()) e.currentTarget.style.background = 'linear-gradient(135deg, rgba(139,92,246,0.22), rgba(59,130,246,0.15))'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'linear-gradient(135deg, rgba(139,92,246,0.12), rgba(59,130,246,0.08))'; }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                      <div style={{ background: 'linear-gradient(135deg, var(--accent-primary), #3b82f6)', padding: '0.6rem', borderRadius: '10px', display: 'flex' }}>
+                        <Film size={18} color="white" />
+                      </div>
+                      <div>
+                        <div style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: '0.9rem' }}>{t.directorModeBtn}</div>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', marginTop: '1px' }}>{t.directorModeDesc}</div>
+                      </div>
+                    </div>
+                    <ArrowRight size={16} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center mt-6 flex-mobile-col">
+                  <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                    {t.ideaFooter} • {t.generationsLeft} <strong style={{ color: generationsUsed >= 99 ? '#ef4444' : '#10b981' }}>{99 - generationsUsed}/99</strong>
+                  </span>
+                  <button
+                    className="btn-primary"
+                    onClick={handleGenerate}
+                    disabled={!idea.trim() || generationsUsed >= 99}
+                    style={{ opacity: (!idea.trim() || generationsUsed >= 99) ? 0.5 : 1, cursor: (!idea.trim() || generationsUsed >= 99) ? 'not-allowed' : 'pointer' }}
+                  >
+                    <Wand2 size={20} />
+                    {t.generateBtn}
+                    <ArrowRight size={18} />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {renderStatus()}
+            {renderResult()}
+
+          </>
+        )}
 
         {/* Video Pipeline Director Mode */}
         {pipelineMode && (
           <div className="mt-8">
             <VideoPipeline
               idea={idea}
-              advanced={advancedArgs}
+              advanced={{ ...advancedArgs, industry: IND_CONFIG[industry][`label_${lang}`] }}
               lang={lang}
               onClose={() => {
                 setPipelineMode(false);
@@ -733,7 +870,7 @@ function App() {
         )}
 
       </main>
-    </div>
+    </div >
   );
 }
 
