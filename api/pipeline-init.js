@@ -93,7 +93,7 @@ async function generateMiniMaxTTS(text, groupId, apiKey) {
             text: text,
             stream: false,
             voice_setting: {
-                voice_id: 'male-qn-jingying',   // 精英青年音色 - confirmed valid
+                voice_id: 'male-qn-qingse',   // 青涩青年音色 - confirmed working ✅
                 speed: 1.0,
                 vol: 1.0,
                 pitch: 0
