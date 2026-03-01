@@ -20,18 +20,18 @@ export default function ShotstackTest() {
         const mockScenes = [
             {
                 status: 'completed',
-                video_url: 'https://shotstack-assets.s3-ap-southeast-2.amazonaws.com/footage/earth.mp4',
-                tts_audio_url: 'https://shotstack-assets.s3-ap-southeast-2.amazonaws.com/music/unminus/cologne.mp3'
+                video_url: 'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+                tts_audio_url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3'
             },
             {
                 status: 'completed',
-                video_url: 'https://shotstack-assets.s3-ap-southeast-2.amazonaws.com/footage/skater.mp4',
-                tts_audio_url: 'https://shotstack-assets.s3-ap-southeast-2.amazonaws.com/music/unminus/cologne.mp3'
+                video_url: 'https://storage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
+                tts_audio_url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3'
             },
             {
                 status: 'completed',
-                video_url: 'https://shotstack-assets.s3-ap-southeast-2.amazonaws.com/footage/surfer.mp4',
-                tts_audio_url: 'https://shotstack-assets.s3-ap-southeast-2.amazonaws.com/music/unminus/cologne.mp3'
+                video_url: 'https://storage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4',
+                tts_audio_url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3'
             }
         ];
 
