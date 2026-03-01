@@ -1,3 +1,5 @@
+import { createClient } from '@supabase/supabase-js';
+
 export default async function handler(req, res) {
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method not allowed' });
@@ -5,6 +7,36 @@ export default async function handler(req, res) {
 
     try {
         const { idea, advanced } = req.body;
+
+        // 1. Initialize Supabase
+        const supabaseUrl = process.env.VITE_SUPABASE_URL;
+        const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY;
+        let knowledgeContext = "";
+
+        if (supabaseUrl && supabaseKey) {
+            const supabase = createClient(supabaseUrl, supabaseKey);
+
+            // 2. Fetch Knowledge Base (Basic RAG implementation for MVP)
+            const { data: knowledgeData, error: dbError } = await supabase
+                .from('agency_knowledge')
+                .select('content, tags');
+
+            if (!dbError && knowledgeData && knowledgeData.length > 0) {
+                // Filter knowledge where tags match the user's idea
+                const ideaLower = idea.toLowerCase();
+                const relevantFacts = knowledgeData.filter(item => {
+                    if (!item.tags) return true; // Include general facts if untagged
+                    return item.tags.some(tag => ideaLower.includes(tag.toLowerCase()));
+                });
+
+                if (relevantFacts.length > 0) {
+                    knowledgeContext = `\n\nCRITICAL INTERNAL AGENCY KNOWLEDGE (USE THIS TO MAKE THE POST FACTUAL):\n`;
+                    relevantFacts.forEach(fact => {
+                        knowledgeContext += `- ${fact.content}\n`;
+                    });
+                }
+            }
+        }
 
         const systemPrompt = `You are a master social media copywriter and animation director for top-tier Chinese study abroad (留学) agencies. 
 Your goal is to take the user's input and generate two things:
@@ -40,6 +72,10 @@ You must return ONLY valid JSON in the following format, with no markdown format
             if (advanced.targetUniv) userPrompt += `TARGET UNIVERSITY TIER: ${advanced.targetUniv}\n`;
             if (advanced.urgencyHook) userPrompt += `URGENCY HOOK: Please inject a psychological urgency trigger (e.g. application deadlines approaching) into the copy.\n`;
             if (advanced.cta) userPrompt += `PRIVATE TRAFFIC CTA: Please explicitly append a conversion-oriented CTA at the end of the post (e.g. 'DM us for a 1v1 review' or 'Comment 1 for timeline').\n`;
+        }
+
+        if (knowledgeContext) {
+            userPrompt += knowledgeContext;
         }
 
         const apiKey = process.env.VITE_LLM_API_KEY;

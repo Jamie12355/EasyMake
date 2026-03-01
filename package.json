@@ -4,13 +4,13 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vercel dev",
+    "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vercel dev",
-    "deploy": "vercel --prod"
+    "preview": "vite preview"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.98.0",
     "lucide-react": "^0.575.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
