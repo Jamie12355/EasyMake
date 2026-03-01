@@ -10,20 +10,20 @@ const i18n = {
     badge: "✨ 专为留学机构打造的零摩擦内容生成工具",
     heroTitle: "打造爆款社媒内容",
     heroHighlight: "零摩擦。",
-    heroSubtitle: "只需输入您的想法，EasyMake 即可瞬间为您的留学机构生成引人入胜的英文文案与高质量的介绍动画。",
+    heroSubtitle: "只需输入您的想法，EasyMake 即可瞬间为您的留学机构生成引人入胜的社媒文案与高质量的介绍动画。",
     ideaTitle: "您的想法是？",
     ideaPlaceholder: "例如：介绍我们的英国本科名校申请服务...",
     ideaFooter: "只需点击一次，剩下的交给我们。",
     generateBtn: "一键生成魔法",
     statusTitle: "魔法正在生效",
-    statusTextActive: "正在为您撰写极具吸引力的英文文案...",
+    statusTextActive: "正在为您撰写极具吸引力的爆款文案...",
     statusTextDone: "文案撰写完成",
     statusTextDesc: "正在优化互动性与内容清晰度",
     statusVidActive: "正在渲染介绍动画...",
     statusVidDone: "动画渲染完成",
     statusVidWait: "等待开始渲染视频动画",
     statusVidDesc: "正在生成关键帧并添加动态效果",
-    resultTextTitle: "生成的英文贴文",
+    resultTextTitle: "生成的社媒贴文",
     copyBtn: "复制文案",
     copiedBtn: "已复制！",
     resultVidTitle: "介绍动画",
@@ -70,7 +70,7 @@ const i18n = {
     cta: "生成私域引流转化文案",
     ctaDesc: "自动在文末添加'私聊领取资料'等高转化引导",
     limitReached: "今日额度已用完",
-    limitReachedDesc: "为控制 API 成本，每个用户每天最多生成 3 次 (搭载 Luma Ray Flash 2 混合渲染模型)",
+    limitReachedDesc: "为控制 API 成本，每个用户每天最多生成 99 次 (搭载 Luma Ray Flash 2 混合渲染模型)",
     generationsLeft: "今日剩余生成次数:",
   },
   en: {
@@ -78,20 +78,20 @@ const i18n = {
     badge: "✨ The easiest way for influencers to generate content",
     heroTitle: "Create viral posts with",
     heroHighlight: "Zero Friction.",
-    heroSubtitle: "Just tell us your idea. EasyMake instantly generates engaging English captions and high-quality introductory animations for your 留学 agency.",
+    heroSubtitle: "Just tell us your idea. EasyMake instantly generates engaging Chinese social media captions and high-quality introductory animations for your 留学 agency.",
     ideaTitle: "What's your idea?",
     ideaPlaceholder: "e.g., Introduction to our UK University application service...",
     ideaFooter: "Press exactly one button. We do the rest.",
     generateBtn: "Generate Magic",
     statusTitle: "Crafting Your Content",
-    statusTextActive: "Writing captivating English copy...",
+    statusTextActive: "Writing captivating Chinese social media copy...",
     statusTextDone: "Copywriting Completed",
     statusTextDesc: "Optimizing for engagement and clarity",
     statusVidActive: "Rendering introductory animation...",
     statusVidDone: "Animation Rendered",
     statusVidWait: "Waiting to render introductory animation",
     statusVidDesc: "Styling frames and creating motion",
-    resultTextTitle: "Generated English Post",
+    resultTextTitle: "Generated Social Media Post",
     copyBtn: "Copy Text",
     copiedBtn: "Copied!",
     resultVidTitle: "Introductory Animation",
@@ -138,7 +138,7 @@ const i18n = {
     cta: "Generate Private Traffic CTAs",
     ctaDesc: "Automatically append high-converting Call-to-Actions (e.g. DM for info)",
     limitReached: "Daily Limit Reached",
-    limitReachedDesc: "To control API costs, each user is limited to 3 generations per day (using Luma Ray Flash 2)",
+    limitReachedDesc: "To control API costs, each user is limited to 99 generations per day (using Luma Ray Flash 2)",
     generationsLeft: "Daily generations remaining:",
   }
 };
@@ -189,7 +189,7 @@ function App() {
   const handleGenerate = async () => {
     if (!idea.trim()) return;
 
-    if (generationsUsed >= 3) {
+    if (generationsUsed >= 99) {
       alert(`${t.limitReached}\n\n${t.limitReachedDesc}`);
       return;
     }
@@ -274,7 +274,7 @@ function App() {
   };
 
   const renderResult = () => {
-    if (status !== "completed" || !result) return null;
+    if (!result || status === "idle" || status === "generating_text") return null;
 
     return (
       <div className="result-grid animate-fade-in mt-12">
@@ -523,13 +523,13 @@ function App() {
 
             <div className="flex justify-between items-center mt-6">
               <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                {t.ideaFooter} • {t.generationsLeft} <strong style={{ color: generationsUsed >= 3 ? '#ef4444' : '#10b981' }}>{3 - generationsUsed}/3</strong>
+                {t.ideaFooter} • {t.generationsLeft} <strong style={{ color: generationsUsed >= 99 ? '#ef4444' : '#10b981' }}>{99 - generationsUsed}/99</strong>
               </span>
               <button
                 className="btn-primary"
                 onClick={handleGenerate}
-                disabled={!idea.trim() || generationsUsed >= 3}
-                style={{ opacity: (!idea.trim() || generationsUsed >= 3) ? 0.5 : 1, cursor: (!idea.trim() || generationsUsed >= 3) ? 'not-allowed' : 'pointer' }}
+                disabled={!idea.trim() || generationsUsed >= 99}
+                style={{ opacity: (!idea.trim() || generationsUsed >= 99) ? 0.5 : 1, cursor: (!idea.trim() || generationsUsed >= 99) ? 'not-allowed' : 'pointer' }}
               >
                 <Wand2 size={20} />
                 {t.generateBtn}

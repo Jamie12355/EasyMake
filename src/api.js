@@ -3,7 +3,7 @@ export async function generateContent(params) {
 
     const systemPrompt = `You are a master social media copywriter and animation director for top-tier Chinese study abroad (留学) agencies. 
 Your goal is to take the user's input and generate two things:
-1. Highly engaging, convincing English social media copy for platforms like Instagram/TikTok.
+1. Highly engaging, convincing Chinese social media copy (爆款文案) tailored for platforms like Xiaohongshu (小红书), WeChat, or Douyin.
 2. A highly detailed English video generation prompt specifically engineered for the 'Luma Dream Machine Ray Flash 2' model.
 
 CRITICAL LUMA PROMPT ENGINEERING RULES:
@@ -37,8 +37,8 @@ You must return ONLY valid JSON in the following format, with no markdown format
     if (advanced.cta) userPrompt += `PRIVATE TRAFFIC CTA: Please explicitly append a conversion-oriented CTA at the end of the post (e.g. 'DM us for a 1v1 review' or 'Comment 1 for timeline').\n`;
 
     const apiKey = import.meta.env.VITE_LLM_API_KEY;
-    const baseUrl = import.meta.env.VITE_LLM_BASE_URL;
     const model = import.meta.env.VITE_LLM_MODEL;
+    const baseUrl = import.meta.env.DEV ? '/api/deepseek' : import.meta.env.VITE_LLM_BASE_URL;
 
     try {
         const res = await fetch(`${baseUrl}/chat/completions`, {
@@ -77,8 +77,8 @@ You must return ONLY valid JSON in the following format, with no markdown format
 
 export async function generateVideo(prompt) {
     const apiKey = import.meta.env.VITE_VIDEO_API_KEY;
-    // Luma Dream Machine API
-    const url = 'https://api.lumalabs.ai/dream-machine/v1/generations';
+    // Luma Dream Machine API proxy
+    const url = import.meta.env.DEV ? '/api/luma/dream-machine/v1/generations' : 'https://api.lumalabs.ai/dream-machine/v1/generations';
 
     try {
         // 1. Initiate video generation task
@@ -90,7 +90,7 @@ export async function generateVideo(prompt) {
             },
             body: JSON.stringify({
                 prompt: prompt,
-                model: import.meta.env.VITE_VIDEO_MODEL || "ray-2-flash"
+                model: import.meta.env.VITE_VIDEO_MODEL || "ray-flash-2"
             })
         });
 
