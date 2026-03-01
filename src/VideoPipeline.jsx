@@ -121,6 +121,9 @@ export default function VideoPipeline({ idea, advanced = {}, lang = 'zh', onClos
             }
         });
 
+        // Always use self-hosted worker.js as blob URL to avoid COEP cross-origin Worker block
+        const workerURL = await toBlobURL('/ffmpeg/ffmpeg-worker.js', 'text/javascript');
+
         let lastError = null;
         for (const src of sources) {
             try {
@@ -128,6 +131,7 @@ export default function VideoPipeline({ idea, advanced = {}, lang = 'zh', onClos
                 await ffmpeg.load({
                     coreURL: await toBlobURL(`${src.base}/ffmpeg-core.js`, 'text/javascript'),
                     wasmURL: await toBlobURL(`${src.base}/ffmpeg-core.wasm`, 'application/wasm'),
+                    workerURL,
                 });
                 addLog('✅ ffmpeg.wasm 加载成功 (' + src.label + ')');
                 return ffmpeg;
