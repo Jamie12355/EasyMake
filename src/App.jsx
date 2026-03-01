@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { Sparkles, Wand2, Copy, Video, CheckCircle2, ArrowRight, Play, FastForward, Globe, Settings2, ChevronDown, ChevronUp, Image, Film } from 'lucide-react';
 import { generateContent, generateVideo, generateImage } from './api';
 import VideoPipeline from './VideoPipeline';
-import FFmpegTest from './FFmpegTest';
 import ShotstackTest from './ShotstackTest';
 import './index.css';
 import './App.css';
@@ -169,7 +168,6 @@ const i18n = {
 
 function App() {
   // Dev/test route — no API costs
-  if (window.location.pathname === '/ffmpeg-test') return <FFmpegTest />;
   if (window.location.pathname === '/shotstack-test') return <ShotstackTest />;
 
   const [lang, setLang] = useState("zh");
