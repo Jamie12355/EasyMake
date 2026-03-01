@@ -41,7 +41,7 @@ export default async function handler(req, res) {
         const systemPrompt = `You are a master social media copywriter and animation director for top-tier Chinese study abroad (留学) agencies. 
 Your goal is to take the user's input and generate three things:
 1. Highly engaging, convincing Chinese social media copy (爆款文案) tailored for platforms like Xiaohongshu (小红书), WeChat, or Douyin.
-2. A highly detailed English video generation prompt specifically engineered for the 'Luma Dream Machine Ray Flash 2' model.
+2. A highly detailed English video generation prompt specifically engineered for the 'Luma Dream Machine Ray 2' model.
 3. A highly detailed English image generation prompt specifically engineered for the 'Luma Photon' model.
 
 CRITICAL LUMA PROMPT ENGINEERING RULES:

@@ -75,9 +75,10 @@ const i18n = {
     cta: "生成私域引流转化文案",
     ctaDesc: "自动在文末添加'私聊领取资料'等高转化引导",
     limitReached: "今日额度已用完",
-    limitReachedDesc: "为控制 API 成本，每个用户每天最多生成 99 次 (搭载 Luma Ray Flash 2 混合渲染模型)",
+    limitReachedDesc: "为控制 API 成本，每个用户每天最多生成 99 次 (搭载 Luma Ray 2 混合渲染模型)",
     generationsLeft: "今日剩余生成次数:",
-    genVideoLabel: "附加生成视频动画 (Luma Ray Flash 2)",
+    genTextLabel: "生成社媒文案 (DeepSeek)",
+    genVideoLabel: "附加生成视频动画 (Luma Ray 2)",
     genImageLabel: "附加生成高清配图 (Luma Photon)",
   },
   en: {
@@ -150,9 +151,10 @@ const i18n = {
     cta: "Generate Private Traffic CTAs",
     ctaDesc: "Automatically append high-converting Call-to-Actions (e.g. DM for info)",
     limitReached: "Daily Limit Reached",
-    limitReachedDesc: "To control API costs, each user is limited to 99 generations per day (using Luma Ray Flash 2)",
+    limitReachedDesc: "To control API costs, each user is limited to 99 generations per day (using Luma Ray 2)",
     generationsLeft: "Daily generations remaining:",
-    genVideoLabel: "Also Generate Animation (Luma Ray Flash 2)",
+    genTextLabel: "Generate Social Media Copy (DeepSeek)",
+    genVideoLabel: "Also Generate Animation (Luma Ray 2)",
     genImageLabel: "Also Generate Image (Luma Photon)",
   }
 };
@@ -177,6 +179,7 @@ function App() {
     cta: false
   });
   const [generationsUsed, setGenerationsUsed] = useState(0);
+  const [generateTextEnabled, setGenerateTextEnabled] = useState(true);
   const [generateVideoEnabled, setGenerateVideoEnabled] = useState(true);
   const [generateImageEnabled, setGenerateImageEnabled] = useState(true);
 
@@ -276,15 +279,17 @@ function App() {
 
         <div className="flex-col gap-6 w-full" style={{ maxWidth: '400px' }}>
           {/* Text Generation Step */}
-          <div className={`status-card ${status === 'generating_text' ? 'active-text' : 'active'}`}>
-            <div className={`status-icon ${status === 'generating_text' ? 'spin' : status !== 'idle' ? 'success' : ''}`}>
-              {status === 'generating_text' ? <Sparkles size={20} color="white" /> : <CheckCircle2 size={20} color="white" />}
+          {generateTextEnabled && (
+            <div className={`status-card ${status === 'generating_text' ? 'active-text' : 'active'}`}>
+              <div className={`status-icon ${status === 'generating_text' ? 'spin' : status !== 'idle' ? 'success' : ''}`}>
+                {status === 'generating_text' ? <Sparkles size={20} color="white" /> : <CheckCircle2 size={20} color="white" />}
+              </div>
+              <div className="status-text">
+                <h4>{status === 'generating_text' ? t.statusTextActive : t.statusTextDone}</h4>
+                <p>{t.statusTextDesc}</p>
+              </div>
             </div>
-            <div className="status-text">
-              <h4>{status === 'generating_text' ? t.statusTextActive : t.statusTextDone}</h4>
-              <p>{t.statusTextDesc}</p>
-            </div>
-          </div>
+          )}
 
           {/* Image Generation Step */}
           {generateImageEnabled && (
@@ -317,10 +322,11 @@ function App() {
   };
 
   const getGridCols = () => {
-    let count = 1;
+    let count = 0;
+    if (generateTextEnabled) count++;
     if (generateImageEnabled) count++;
     if (generateVideoEnabled) count++;
-    if (count === 1) return 'single-col';
+    if (count <= 1) return 'single-col';
     if (count === 3) return 'triple-col';
     return '';
   };
@@ -331,24 +337,26 @@ function App() {
     return (
       <div className={`result-grid animate-fade-in mt-12 ${getGridCols()}`}>
         {/* Text Result */}
-        <div className="glass-panel flex-col flex">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="card-title m-0">
-              <Sparkles style={{ color: 'var(--accent-primary)' }} />
-              {t.resultTextTitle}
-            </h3>
-            <button
-              onClick={copyToClipboard}
-              className="btn-secondary"
-            >
-              {copied ? <CheckCircle2 size={16} style={{ color: '#10B981' }} /> : <Copy size={16} />}
-              {copied ? t.copiedBtn : t.copyBtn}
-            </button>
+        {generateTextEnabled && (
+          <div className="glass-panel flex-col flex">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="card-title m-0">
+                <Sparkles style={{ color: 'var(--accent-primary)' }} />
+                {t.resultTextTitle}
+              </h3>
+              <button
+                onClick={copyToClipboard}
+                className="btn-secondary"
+              >
+                {copied ? <CheckCircle2 size={16} style={{ color: '#10B981' }} /> : <Copy size={16} />}
+                {copied ? t.copiedBtn : t.copyBtn}
+              </button>
+            </div>
+            <div className="result-card-content">
+              {result.text}
+            </div>
           </div>
-          <div className="result-card-content">
-            {result.text}
-          </div>
-        </div>
+        )}
 
         {/* Image Result */}
         {generateImageEnabled && (
@@ -476,6 +484,16 @@ function App() {
             />
 
             <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--text-primary)', fontSize: '0.9rem', cursor: 'pointer', fontWeight: 500, background: 'rgba(255,255,255,0.03)', padding: '0.8rem 1.2rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <input
+                  type="checkbox"
+                  checked={generateTextEnabled}
+                  onChange={(e) => setGenerateTextEnabled(e.target.checked)}
+                  style={{ width: '18px', height: '18px', accentColor: 'var(--accent-primary)', cursor: 'pointer' }}
+                />
+                {t.genTextLabel}
+              </label>
+
               <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--text-primary)', fontSize: '0.9rem', cursor: 'pointer', fontWeight: 500, background: 'rgba(255,255,255,0.03)', padding: '0.8rem 1.2rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
                 <input
                   type="checkbox"

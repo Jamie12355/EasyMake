@@ -16,7 +16,7 @@ export default async function handler(req, res) {
             },
             body: JSON.stringify({
                 prompt: prompt,
-                model: process.env.VITE_VIDEO_MODEL || "ray-flash-2"
+                model: process.env.VITE_VIDEO_MODEL || "ray-2"
             })
         });
 
