@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Sparkles, Wand2, Copy, Video, CheckCircle2, ArrowRight, Play, FastForward, Globe, Settings2, ChevronDown, ChevronUp } from 'lucide-react';
-import { generateContent, generateVideo } from './api';
+import { Sparkles, Wand2, Copy, Video, CheckCircle2, ArrowRight, Play, FastForward, Globe, Settings2, ChevronDown, ChevronUp, Image } from 'lucide-react';
+import { generateContent, generateVideo, generateImage } from './api';
 import './index.css';
 import './App.css';
 
@@ -23,11 +23,16 @@ const i18n = {
     statusVidDone: "动画渲染完成",
     statusVidWait: "等待开始渲染视频动画",
     statusVidDesc: "正在生成关键帧并添加动态效果",
+    statusImgActive: "正在为您绘制超清配图...",
+    statusImgDone: "配图绘制完成",
+    statusImgWait: "等待绘制静止影像",
+    statusImgDesc: "使用 Photon 模型进行视觉推理",
     resultTextTitle: "生成的社媒贴文",
     copyBtn: "复制文案",
     copiedBtn: "已复制！",
     resultVidTitle: "介绍动画",
-    downloadBtn: "下载 MP4",
+    resultImgTitle: "社媒配图",
+    downloadBtn: "下载",
     createAnotherBtn: "创建下一篇帖子",
     langCode: "中 / EN",
     switchLang: "Switch to English",
@@ -73,6 +78,7 @@ const i18n = {
     limitReachedDesc: "为控制 API 成本，每个用户每天最多生成 99 次 (搭载 Luma Ray Flash 2 混合渲染模型)",
     generationsLeft: "今日剩余生成次数:",
     genVideoLabel: "附加生成视频动画 (Luma Ray Flash 2)",
+    genImageLabel: "附加生成高清配图 (Luma Photon)",
   },
   en: {
     dashboard: "Dashboard",
@@ -92,11 +98,16 @@ const i18n = {
     statusVidDone: "Animation Rendered",
     statusVidWait: "Waiting to render introductory animation",
     statusVidDesc: "Styling frames and creating motion",
+    statusImgActive: "Rendering high-resolution image...",
+    statusImgDone: "Image Rendered",
+    statusImgWait: "Waiting to render image",
+    statusImgDesc: "Visual synthesis via Photon",
     resultTextTitle: "Generated Social Media Post",
     copyBtn: "Copy Text",
     copiedBtn: "Copied!",
     resultVidTitle: "Introductory Animation",
-    downloadBtn: "Download MP4",
+    resultImgTitle: "Social Media Image",
+    downloadBtn: "Download",
     createAnotherBtn: "Create Another Post",
     langCode: "EN / 中",
     switchLang: "切换为中文",
@@ -142,6 +153,7 @@ const i18n = {
     limitReachedDesc: "To control API costs, each user is limited to 99 generations per day (using Luma Ray Flash 2)",
     generationsLeft: "Daily generations remaining:",
     genVideoLabel: "Also Generate Animation (Luma Ray Flash 2)",
+    genImageLabel: "Also Generate Image (Luma Photon)",
   }
 };
 
@@ -166,6 +178,7 @@ function App() {
   });
   const [generationsUsed, setGenerationsUsed] = useState(0);
   const [generateVideoEnabled, setGenerateVideoEnabled] = useState(true);
+  const [generateImageEnabled, setGenerateImageEnabled] = useState(true);
 
   const t = i18n[lang];
 
@@ -212,8 +225,18 @@ function App() {
       // We can show the text result immediately while the video is still generating!
       setResult({
         text: llmResult.social_media_post,
-        videoUrl: null
+        videoUrl: null,
+        imageUrl: null
       });
+
+      if (generateImageEnabled) {
+        setStatus("generating_image");
+        const finalImageUrl = await generateImage(llmResult.image_prompt);
+        setResult(prev => ({
+          ...prev,
+          imageUrl: finalImageUrl || "/uk_university_ad.png"
+        }));
+      }
 
       if (generateVideoEnabled) {
         setStatus("generating_video");
@@ -263,6 +286,19 @@ function App() {
             </div>
           </div>
 
+          {/* Image Generation Step */}
+          {generateImageEnabled && (
+            <div className={`status-card ${status === 'generating_image' ? 'active-video' : (status === 'generating_video' || status === 'completed') ? 'active' : 'inactive'}`}>
+              <div className={`status-icon ${(status === 'generating_video' || status === 'completed') ? 'success' : status === 'generating_image' ? 'pulse' : ''}`}>
+                {(status === 'generating_video' || status === 'completed') ? <CheckCircle2 size={20} color="white" /> : <Image size={20} color="white" />}
+              </div>
+              <div className="status-text">
+                <h4>{status === 'generating_image' ? t.statusImgActive : (status === 'generating_video' || status === 'completed') ? t.statusImgDone : t.statusImgWait}</h4>
+                <p>{t.statusImgDesc}</p>
+              </div>
+            </div>
+          )}
+
           {/* Video Generation Step */}
           {generateVideoEnabled && (
             <div className={`status-card ${status === 'generating_video' ? 'active-video' : status === 'completed' ? 'active' : 'inactive'}`}>
@@ -280,11 +316,20 @@ function App() {
     );
   };
 
+  const getGridCols = () => {
+    let count = 1;
+    if (generateImageEnabled) count++;
+    if (generateVideoEnabled) count++;
+    if (count === 1) return 'single-col';
+    if (count === 3) return 'triple-col';
+    return '';
+  };
+
   const renderResult = () => {
     if (!result || status === "idle" || status === "generating_text") return null;
 
     return (
-      <div className={`result-grid animate-fade-in mt-12 ${!generateVideoEnabled ? 'single-col' : ''}`}>
+      <div className={`result-grid animate-fade-in mt-12 ${getGridCols()}`}>
         {/* Text Result */}
         <div className="glass-panel flex-col flex">
           <div className="flex justify-between items-center mb-6">
@@ -304,6 +349,33 @@ function App() {
             {result.text}
           </div>
         </div>
+
+        {/* Image Result */}
+        {generateImageEnabled && (
+          <div className="glass-panel flex-col flex animate-fade-in">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="card-title m-0">
+                <Image style={{ color: 'var(--accent-primary)' }} />
+                {t.resultImgTitle}
+              </h3>
+              <button className="btn-secondary text-sm">
+                <FastForward size={16} />
+                {t.downloadBtn}
+              </button>
+            </div>
+            <div className="video-container" style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {result.imageUrl ? (
+                <img
+                  src={result.imageUrl}
+                  alt="Generated Image"
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', inset: 0, borderRadius: '8px' }}
+                />
+              ) : (
+                <div className="pulse" style={{ color: 'var(--text-secondary)' }}>Rendering Image from Cloud...</div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Video Result */}
         {generateVideoEnabled && (
@@ -403,8 +475,18 @@ function App() {
               onChange={(e) => setIdea(e.target.value)}
             />
 
-            <div style={{ marginTop: '1.5rem', display: 'flex', alignItems: 'center' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--text-primary)', fontSize: '1rem', cursor: 'pointer', fontWeight: 500, background: 'rgba(255,255,255,0.03)', padding: '0.8rem 1.2rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+            <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--text-primary)', fontSize: '0.9rem', cursor: 'pointer', fontWeight: 500, background: 'rgba(255,255,255,0.03)', padding: '0.8rem 1.2rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <input
+                  type="checkbox"
+                  checked={generateImageEnabled}
+                  onChange={(e) => setGenerateImageEnabled(e.target.checked)}
+                  style={{ width: '18px', height: '18px', accentColor: 'var(--accent-primary)', cursor: 'pointer' }}
+                />
+                {t.genImageLabel}
+              </label>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--text-primary)', fontSize: '0.9rem', cursor: 'pointer', fontWeight: 500, background: 'rgba(255,255,255,0.03)', padding: '0.8rem 1.2rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
                 <input
                   type="checkbox"
                   checked={generateVideoEnabled}

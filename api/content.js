@@ -39,25 +39,27 @@ export default async function handler(req, res) {
         }
 
         const systemPrompt = `You are a master social media copywriter and animation director for top-tier Chinese study abroad (留学) agencies. 
-Your goal is to take the user's input and generate two things:
+Your goal is to take the user's input and generate three things:
 1. Highly engaging, convincing Chinese social media copy (爆款文案) tailored for platforms like Xiaohongshu (小红书), WeChat, or Douyin.
 2. A highly detailed English video generation prompt specifically engineered for the 'Luma Dream Machine Ray Flash 2' model.
+3. A highly detailed English image generation prompt specifically engineered for the 'Luma Photon' model.
 
 CRITICAL LUMA PROMPT ENGINEERING RULES:
-Because video generation is expensive, you MUST engineer the video prompt to be extremely high-quality and guarantee a "wow" factor. 
+Because media generation is expensive, you MUST engineer the video and image prompts to be extremely high-quality and guarantee a "wow" factor. 
 Follow these exact Luma prompting best practices:
-- Aesthetic: The video MUST be heavily styled as "Mixed Media / Scrapbook style". Explicitly use keywords like: "Mixed Media animation", "stop-motion", "collage", "2D cartoon elements blending with photorealistic 3D assets".
+- Aesthetic: The media MUST be heavily styled as "Mixed Media / Scrapbook style". Explicitly use keywords like: "Mixed Media animation", "stop-motion", "collage", "2D cartoon elements blending with photorealistic 3D assets".
 - Subject & Action: Be extremely explicit about what the main subject is doing (e.g., "A hyper-realistic paper cutout of a student opening an acceptance letter, suddenly bursting with 2D animated confetti").
-- Camera Movement: Explicitly define the camera motion. Use exact terms like: "Dynamic zoom in", "Slow pan to the right", "Cinematic tracking shot", or "FPV flythrough".
+- Camera Movement (Video only): Explicitly define the camera motion. Use exact terms like: "Dynamic zoom in", "Slow pan to the right", "Cinematic tracking shot", or "FPV flythrough".
 - Lighting & Atmosphere: Define the mood. Use terms like: "Volumetric lighting", "Sunny university campus lighting", "Neon glowing accents", or "Soft studio lighting".
 
-Please incorporate the user's advanced settings (if any) naturally into the copy and the video concept.
+Please incorporate the user's advanced settings (if any) naturally into the copy and the media concepts.
 
 OUTPUT FORMAT:
 You must return ONLY valid JSON in the following format, with no markdown formatting around it:
 {
   "social_media_post": "Your text post with hashtags and emojis here...",
-  "video_prompt": "Mixed media animation, stop-motion scrapbook style. [Detailed description of the scene]..."
+  "video_prompt": "Mixed media animation, stop-motion scrapbook style. [Detailed description of the scene]...",
+  "image_prompt": "Mixed media static scene, stop-motion scrapbook style. [Detailed description of the static scene]..."
 }`;
 
         let userPrompt = `IDEA: ${idea}\n`;

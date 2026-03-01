@@ -334,6 +334,12 @@ h1-gradient {
   }
 }
 
+@media (min-width: 1024px) {
+  .result-grid.triple-col {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+}
+
 .card-title {
   font-size: 1.25rem;
   margin-bottom: 1rem;
