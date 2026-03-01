@@ -1,19 +1,24 @@
 // Generates script/storyboard only - no Luma or TTS fired
 // Used by the Planning phase of the Director Mode editor
+
+const LLM_BASE_URL = process.env.VITE_LLM_BASE_URL || 'https://api.deepseek.com';
+const LLM_API_KEY = process.env.VITE_LLM_API_KEY || '';
+const LLM_MODEL = process.env.VITE_LLM_MODEL || 'deepseek-chat';
+
 export default async function handler(req, res) {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
     const { idea, advanced = {}, scene_count = 3 } = req.body;
 
     try {
-        const llmRes = await fetch(`${process.env.VITE_LLM_BASE_URL}/chat/completions`, {
+        const llmRes = await fetch(`${LLM_BASE_URL}/chat/completions`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${process.env.VITE_LLM_API_KEY}`
+                'Authorization': `Bearer ${LLM_API_KEY}`
             },
             body: JSON.stringify({
-                model: process.env.VITE_LLM_MODEL || 'deepseek-chat',
+                model: LLM_MODEL,
                 messages: [
                     {
                         role: 'system',

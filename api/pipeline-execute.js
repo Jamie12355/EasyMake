@@ -1,16 +1,23 @@
 // Executes the pipeline for user-defined scenes (fires Luma + TTS)
 // Called after the user finalizes their storyboard in the Plan phase
 
+// Hardcoded fallbacks so env vars never cause URL parse errors
+const LLM_BASE_URL = process.env.VITE_LLM_BASE_URL || 'https://api.deepseek.com';
+const LLM_API_KEY = process.env.VITE_LLM_API_KEY || '';
+const LLM_MODEL = process.env.VITE_LLM_MODEL || 'deepseek-chat';
+const VIDEO_API_KEY = process.env.VITE_VIDEO_API_KEY || '';
+const VIDEO_MODEL = process.env.VITE_VIDEO_MODEL || 'ray-2';
+
 async function fireLumaVideo(prompt) {
     const res = await fetch('https://api.lumalabs.ai/dream-machine/v1/generations', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${process.env.VITE_VIDEO_API_KEY}`
+            'Authorization': `Bearer ${VIDEO_API_KEY}`
         },
         body: JSON.stringify({
             prompt,
-            model: process.env.VITE_VIDEO_MODEL || 'ray-2',
+            model: VIDEO_MODEL,
             aspect_ratio: '9:16',
             loop: false
         })
@@ -54,30 +61,41 @@ async function generateMiniMaxTTS(text, groupId, apiKey) {
 
 // Auto-generate a Luma prompt from TTS text if user didn't provide one
 async function autoGenerateLumaPrompt(ttsText, sceneLabel) {
-    const res = await fetch(`${process.env.VITE_LLM_BASE_URL}/chat/completions`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${process.env.VITE_LLM_API_KEY}`
-        },
-        body: JSON.stringify({
-            model: process.env.VITE_LLM_MODEL || 'deepseek-chat',
-            messages: [
-                {
-                    role: 'system',
-                    content: `Generate a single highly detailed English visual prompt for Luma Ray 2 (9:16 vertical format) based on a Chinese short video script line. The prompt must be cinematic, study abroad themed, and include camera movement, lighting, and aesthetic style. Return ONLY the prompt text, nothing else.`
-                },
-                {
-                    role: 'user',
-                    content: `Script: "${ttsText}" | Scene role: ${sceneLabel}`
-                }
-            ],
-            temperature: 0.8,
-            max_tokens: 150
-        })
-    });
-    const data = await res.json();
-    return data.choices[0].message.content.trim();
+    // Fallback prompt in case LLM call fails
+    const fallbackPrompt = `Cinematic 9:16 vertical video, study abroad theme, Chinese university student holding acceptance letter, modern campus background, golden hour lighting, slow zoom in camera, mixed media scrapbook style, vivid colors`;
+
+    try {
+        if (!LLM_API_KEY) return fallbackPrompt;
+
+        const res = await fetch(`${LLM_BASE_URL}/chat/completions`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${LLM_API_KEY}`
+            },
+            body: JSON.stringify({
+                model: LLM_MODEL,
+                messages: [
+                    {
+                        role: 'system',
+                        content: `Generate a single highly detailed English visual prompt for Luma Ray 2 (9:16 vertical format) based on a Chinese short video script line. The prompt must be cinematic, study abroad themed, and include camera movement, lighting, and aesthetic style. Return ONLY the prompt text, nothing else.`
+                    },
+                    {
+                        role: 'user',
+                        content: `Script: "${ttsText}" | Scene role: ${sceneLabel}`
+                    }
+                ],
+                temperature: 0.8,
+                max_tokens: 150
+            })
+        });
+        if (!res.ok) return fallbackPrompt;
+        const data = await res.json();
+        return data.choices?.[0]?.message?.content?.trim() || fallbackPrompt;
+    } catch (e) {
+        console.warn('[autoGenerateLumaPrompt] Failed, using fallback:', e.message);
+        return fallbackPrompt;
+    }
 }
 
 export default async function handler(req, res) {
