@@ -12,6 +12,28 @@
                     "value": "require-corp"
                 }
             ]
+        },
+        {
+            "source": "/ffmpeg/(.*)\\.wasm",
+            "headers": [
+                {
+                    "key": "Content-Type",
+                    "value": "application/wasm"
+                },
+                {
+                    "key": "Cache-Control",
+                    "value": "public, max-age=31536000, immutable"
+                }
+            ]
+        },
+        {
+            "source": "/ffmpeg/(.*)\\.js",
+            "headers": [
+                {
+                    "key": "Cache-Control",
+                    "value": "public, max-age=31536000, immutable"
+                }
+            ]
         }
     ]
 }

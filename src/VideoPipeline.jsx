@@ -107,30 +107,37 @@ export default function VideoPipeline({ idea, advanced = {}, lang = 'zh', onClos
         const ffmpeg = new FFmpeg();
         ffmpegRef.current = ffmpeg;
 
-        // Try unpkg first, fall back to jsdelivr
-        const cdns = [
-            'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd',
-            'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd',
+        // Try self-hosted (fastest, no CDN latency) then fall back to CDNs
+        const sources = [
+            { label: '本地文件 (fastest)', base: '/ffmpeg' },
+            { label: 'unpkg CDN', base: 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd' },
+            { label: 'jsdelivr CDN', base: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd' },
         ];
 
+        // Track progress for the WASM download
+        ffmpeg.on('progress', ({ progress }) => {
+            if (progress < 1) {
+                addLog(`⤵️ ffmpeg 加载进度: ${Math.round(progress * 100)}%`);
+            }
+        });
+
         let lastError = null;
-        for (const baseURL of cdns) {
+        for (const src of sources) {
             try {
-                addLog(`加载 ffmpeg.wasm (${baseURL.includes('unpkg') ? 'unpkg' : 'jsdelivr'})...`);
+                addLog(`加载 ffmpeg.wasm (${src.label})...`);
                 await ffmpeg.load({
-                    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-                    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+                    coreURL: await toBlobURL(`${src.base}/ffmpeg-core.js`, 'text/javascript'),
+                    wasmURL: await toBlobURL(`${src.base}/ffmpeg-core.wasm`, 'application/wasm'),
                 });
-                addLog('✅ ffmpeg.wasm 加载成功');
+                addLog('✅ ffmpeg.wasm 加载成功 (' + src.label + ')');
                 return ffmpeg;
             } catch (e) {
                 lastError = e;
-                addLog(`⚠️ CDN ${baseURL.includes('unpkg') ? 'unpkg' : 'jsdelivr'} 加载失败，尝试备用...`);
+                addLog(`⚠️ ${src.label} 失败，尝试下一个...`);
             }
         }
 
-        // Both CDNs failed - likely missing COOP/COEP headers (SharedArrayBuffer)
-        const errMsg = lastError?.message || String(lastError) || 'ffmpeg.wasm 加载失败 — 请确保用 HTTPS 访问，或浏览器支持 SharedArrayBuffer';
+        const errMsg = lastError?.message || String(lastError) || 'ffmpeg.wasm 加载失败';
         throw new Error(errMsg);
     };
 
