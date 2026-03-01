@@ -242,6 +242,29 @@ export default function VideoPipeline({ idea, advanced = {}, lang = 'zh', onClos
 
     const allScenesHaveText = scenes.every(s => s.tts_text.trim().length > 0);
 
+    // Check if all scenes are done (video + audio ready) so we can retry just the stitch
+    const canRetryStitch = currentStep === 'error' &&
+        scenes.length > 0 &&
+        scenes.every(s => s.video_url && s.tts_audio);
+
+    const retryStitch = async () => {
+        setError(null);
+        setCurrentStep('stitch');
+        setLog(prev => [...prev, `[${new Date().toLocaleTimeString()}] 重试剪辑拼接...`]);
+        try {
+            const outputUrl = await stitchVideos(scenes);
+            setFinalVideoUrl(outputUrl);
+            setCurrentStep('done');
+            addLog('🎬 视频生成完毕！');
+        } catch (err) {
+            const errMsg = err?.message || String(err) || '剪辑失败';
+            setError(errMsg);
+            setCurrentStep('error');
+            addLog(`❌ 错误: ${errMsg}`);
+            console.error('[Retry Stitch]', err);
+        }
+    };
+
     // ============== PLAN PHASE UI ==============
     if (phase === 'plan') {
         return (
@@ -453,9 +476,29 @@ export default function VideoPipeline({ idea, advanced = {}, lang = 'zh', onClos
 
             {/* Error */}
             {error && (
-                <div style={{ padding: '0.85rem 1rem', background: 'rgba(239,68,68,0.08)', borderRadius: '12px', border: '1px solid rgba(239,68,68,0.2)', marginBottom: '1rem', display: 'flex', gap: '0.6rem' }}>
-                    <AlertCircle size={16} color="#ef4444" style={{ flexShrink: 0, marginTop: '2px' }} />
-                    <div><p style={{ color: '#ef4444', fontWeight: 600, margin: '0 0 0.2rem' }}>错误</p><p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', margin: 0 }}>{error}</p></div>
+                <div style={{ padding: '0.85rem 1rem', background: 'rgba(239,68,68,0.08)', borderRadius: '12px', border: '1px solid rgba(239,68,68,0.2)', marginBottom: '1rem' }}>
+                    <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'flex-start' }}>
+                        <AlertCircle size={16} color="#ef4444" style={{ flexShrink: 0, marginTop: '2px' }} />
+                        <div style={{ flex: 1 }}>
+                            <p style={{ color: '#ef4444', fontWeight: 600, margin: '0 0 0.2rem' }}>错误</p>
+                            <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', margin: 0 }}>{error}</p>
+                        </div>
+                    </div>
+                    {canRetryStitch && (
+                        <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(239,68,68,0.15)' }}>
+                            <p style={{ color: '#f59e0b', fontSize: '0.8rem', marginBottom: '0.75rem' }}>
+                                ✅ 所有视频和配音已就绪——可以直接重试剪辑而无需重新渲染
+                            </p>
+                            <button
+                                onClick={retryStitch}
+                                className="btn-primary"
+                                style={{ fontSize: '0.85rem', padding: '0.6rem 1.2rem', gap: '0.5rem' }}
+                            >
+                                <Scissors size={15} />
+                                重试剪辑拼接 (Retry Stitch)
+                            </button>
+                        </div>
+                    )}
                 </div>
             )}
 
