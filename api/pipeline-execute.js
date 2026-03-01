@@ -27,6 +27,13 @@ async function fireLumaVideo(prompt) {
     return data.id;
 }
 
+export const config = {
+    maxDuration: 60, // Luma Ray 2 queue can be slow, giving Vercel fn max time
+};
+
+import { put } from '@vercel/blob';
+
+// --- API Helper Functions ---
 async function generateMiniMaxTTS(text, groupId, apiKey) {
     const res = await fetch(`https://api.minimaxi.chat/v1/t2a_v2?GroupId=${groupId}`, {
         method: 'POST',
@@ -121,15 +128,27 @@ export default async function handler(req, res) {
                 generateMiniMaxTTS(scene.tts_text, minimaxGroupId, minimaxApiKey)
             ]);
 
+            // Convert Base64 data URI to Buffer for Blob upload
+            const base64Data = ttsAudioBase64.split(',')[1] || ttsAudioBase64;
+            const audioBuffer = Buffer.from(base64Data, 'base64');
+
+            // Upload to Vercel Blob to get a public URL for Shotstack
+            const blobUpload = await put(`tts-${Date.now()}-${Math.random().toString(36).substring(7)}.mp3`, audioBuffer, {
+                access: 'public',
+                contentType: 'audio/mp3'
+            });
+
             return {
                 ...scene,
                 luma_prompt: lumaPrompt,
                 luma_job_id: lumaId,
-                tts_audio: ttsAudioBase64,
+                tts_audio: ttsAudioBase64,       // Keeping base64 just in case frontend still wants to play it
+                tts_audio_url: blobUpload.url,   // NEW: The public URL for Shotstack
                 video_url: null,
                 status: 'rendering'
             };
         }));
+
 
         return res.status(200).json({ scenes: enrichedScenes });
     } catch (error) {

@@ -18,21 +18,91 @@ export default async function handler(req, res) {
 
         if (!SHOTSTACK_API_KEY) {
             return res.status(500).json({
-                error: 'Shotstack API key (SHOTSTACK_API_KEY) was not found in environment variables. Please add it to your .env or Vercel dashboard.'
+                error: 'Shotstack API key (SHOTSTACK_API_KEY) was not found in environment variables.'
             });
         }
 
-        // =========================================================================
-        // PRE-PROCESSING
-        // Shotstack requires public URLs for audio. Since our TTS audio is base64, 
-        // we either need to upload it to a storage bucket (Vercel Blob, S3, Supabase)
-        // OR have the TTS generation step save directly to storage instead of base64.
-        // For right now, returning a hard failure so we can set up the storage.
-        // =========================================================================
-
-        return res.status(500).json({
-            error: 'Backend implementation required: Because cloud editors need public URLs for audio (not base64), we need a place to upload the TTS audio first. Do you want to use Vercel Blob (free, instant) or Supabase?'
+        // 1. Build Shotstack Timeline
+        const videoClips = scenes.map((scene, i) => {
+            return {
+                asset: { type: 'video', src: scene.video_url },
+                start: i * 5,
+                length: 5,
+                fit: 'cover' // Ensures it fills 9:16
+            };
         });
+
+        const audioClips = scenes.map((scene, i) => {
+            return {
+                asset: { type: 'audio', src: scene.tts_audio_url },
+                start: i * 5,
+                length: 5
+            };
+        });
+
+        const payload = {
+            timeline: {
+                background: '#000000',
+                tracks: [
+                    { clips: audioClips },
+                    { clips: videoClips }
+                ]
+            },
+            output: {
+                format: 'mp4',
+                resolution: '1080',
+                aspectRatio: '9:16'
+            }
+        };
+
+        // 2. Submit Render task to Shotstack
+        const response = await fetch('https://api.shotstack.io/edit/v1/render', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': SHOTSTACK_API_KEY
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+            const err = await response.text();
+            throw new Error(`Shotstack submission failed: ${err}`);
+        }
+
+        const data = await response.json();
+        const renderId = data.response.id;
+
+        // 3. Poll for completion (Shotstack is very fast, usually < 15s for short clips)
+        let videoUrl = null;
+        let attempts = 0;
+
+        while (attempts < 15) { // 30s max wait
+            await new Promise(r => setTimeout(r, 2000));
+            attempts++;
+
+            const pollRes = await fetch(`https://api.shotstack.io/edit/v1/render/${renderId}`, {
+                headers: { 'x-api-key': SHOTSTACK_API_KEY }
+            });
+
+            if (!pollRes.ok) continue;
+
+            const pollData = await pollRes.json();
+            const status = pollData.response.status;
+
+            if (status === 'done') {
+                videoUrl = pollData.response.url;
+                break;
+            } else if (status === 'failed') {
+                throw new Error(`Shotstack render failed: ${pollData.response.error}`);
+            }
+        }
+
+        if (!videoUrl) {
+            throw new Error('云渲染超时，请稍后重试');
+        }
+
+        return res.status(200).json({ video_url: videoUrl });
 
     } catch (error) {
         console.error('Stitching API Error:', error);
