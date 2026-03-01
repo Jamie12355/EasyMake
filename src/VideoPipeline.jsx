@@ -103,17 +103,35 @@ export default function VideoPipeline({ idea, advanced = {}, lang = 'zh', onClos
         }
     };
 
-    // --- Pipeline Execution ---
     const loadFFmpeg = async () => {
         const ffmpeg = new FFmpeg();
         ffmpegRef.current = ffmpeg;
-        const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
-        await ffmpeg.load({
-            coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-            wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
-        });
-        addLog('ffmpeg.wasm 加载完成');
-        return ffmpeg;
+
+        // Try unpkg first, fall back to jsdelivr
+        const cdns = [
+            'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd',
+            'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd',
+        ];
+
+        let lastError = null;
+        for (const baseURL of cdns) {
+            try {
+                addLog(`加载 ffmpeg.wasm (${baseURL.includes('unpkg') ? 'unpkg' : 'jsdelivr'})...`);
+                await ffmpeg.load({
+                    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+                    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+                });
+                addLog('✅ ffmpeg.wasm 加载成功');
+                return ffmpeg;
+            } catch (e) {
+                lastError = e;
+                addLog(`⚠️ CDN ${baseURL.includes('unpkg') ? 'unpkg' : 'jsdelivr'} 加载失败，尝试备用...`);
+            }
+        }
+
+        // Both CDNs failed - likely missing COOP/COEP headers (SharedArrayBuffer)
+        const errMsg = lastError?.message || String(lastError) || 'ffmpeg.wasm 加载失败 — 请确保用 HTTPS 访问，或浏览器支持 SharedArrayBuffer';
+        throw new Error(errMsg);
     };
 
     const pollScenes = async (scenesData) => {
@@ -211,9 +229,11 @@ export default function VideoPipeline({ idea, advanced = {}, lang = 'zh', onClos
             setCurrentStep('done');
             addLog('🎬 视频生成完毕！');
         } catch (err) {
-            setError(err.message);
+            const errMsg = err?.message || String(err) || '未知错误，请检查浏览器控制台';
+            setError(errMsg);
             setCurrentStep('error');
-            addLog(`❌ 错误: ${err.message}`);
+            addLog(`❌ 错误: ${errMsg}`);
+            console.error('[Pipeline] Full error:', err);
         }
     };
 
