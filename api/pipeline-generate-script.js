@@ -11,7 +11,7 @@ export default async function handler(req, res) {
     const { idea, advanced = {}, scene_count = 3, videoMode = 'real_person' } = req.body;
 
     const modeInstruction = videoMode === 'real_person'
-        ? "- luma_prompt: Detailed English visual prompt (9:16 vertical). MUST describe a realistic human (e.g., student, consultant) looking directly at the camera, talking and naturally lip-syncing to the viewer."
+        ? "- luma_prompt: Detailed English visual prompt (9:16 vertical). MUST describe a realistic young Chinese male (e.g., student, consultant) looking directly at the camera, talking and naturally lip-syncing to the viewer. Gender MUST be male to match the voice."
         : "- luma_prompt: Detailed English visual prompt (9:16 vertical). MUST describe a high-quality 3D cartoon/Pixar styled animation. Do NOT include a real person.";
 
     try {

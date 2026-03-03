@@ -167,6 +167,64 @@ export default function VideoPipeline({ idea, advanced = {}, lang = 'zh', onClos
     };
 
 
+    const performLipSync = async (scenesData) => {
+        addLog(`开始执行 ${scenesData.length} 个分镜的唇形同步任务...`);
+        const synced = [...scenesData];
+        const syncJobs = await Promise.all(scenesData.map(async (scene, i) => {
+            if (scene.status !== 'completed' || !scene.video_url || !scene.tts_audio_url) return null;
+            addLog(`请求 Scene ${i + 1} 唇形同步...`);
+            try {
+                const res = await fetch('/api/pipeline-lipsync', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ video_url: scene.video_url, audio_url: scene.tts_audio_url })
+                });
+                if (!res.ok) throw new Error(await res.text());
+                const data = await res.json();
+                return { index: i, taskId: data.taskId };
+            } catch (e) {
+                console.error(`Lip Sync init failed for scene ${i}:`, e);
+                return null;
+            }
+        }));
+
+        const validJobs = syncJobs.filter(Boolean);
+        if (validJobs.length === 0) return synced;
+
+        addLog(`监控 ${validJobs.length} 个唇形同步任务...`);
+        let completed = new Array(validJobs.length).fill(false);
+        while (!completed.every(Boolean)) {
+            await new Promise(r => setTimeout(r, 5000));
+            const activeJobs = validJobs.filter((_, idx) => !completed[idx]);
+            if (activeJobs.length === 0) break;
+
+            const ids = activeJobs.map(j => j.taskId).join(',');
+            const res = await fetch(`/api/lipsync-status?ids=${ids}`);
+            if (!res.ok) continue;
+
+            const { results } = await res.json();
+            results.forEach((r) => {
+                const jobIndex = validJobs.findIndex(j => j.taskId === r.id);
+                if (jobIndex === -1) return;
+
+                const sceneIndex = validJobs[jobIndex].index;
+                if (r.status === 'completed' && r.video_url) {
+                    if (!completed[jobIndex]) addLog(`✅ Scene ${sceneIndex + 1} 唇形同步完成`);
+                    completed[jobIndex] = true;
+                    // Replace video_url with the synced one
+                    synced[sceneIndex] = { ...synced[sceneIndex], video_url: r.video_url };
+                    setScenes([...synced]);
+                } else if (r.status === 'failed') {
+                    if (!completed[jobIndex]) addLog(`❌ Scene ${sceneIndex + 1} 唇形同步失败，保留原视频`);
+                    completed[jobIndex] = true;
+                } else {
+                    addLog(`👄 Scene ${sceneIndex + 1} 唇对齐中...`);
+                }
+            });
+        }
+        return synced;
+    };
+
     const runPipeline = async () => {
         const validScenes = scenes.filter(s => s.tts_text.trim());
         if (validScenes.length === 0) return;
@@ -191,7 +249,14 @@ export default function VideoPipeline({ idea, advanced = {}, lang = 'zh', onClos
             addLog(`✅ Luma 任务已提交，配音已生成！`);
             setCurrentStep('luma');
             const finalScenes = await pollScenes(enriched);
-            const outputUrl = await stitchVideos(finalScenes);
+            let syncedScenes = finalScenes;
+
+            if (videoMode === 'real_person') {
+                setCurrentStep('lipsync');
+                syncedScenes = await performLipSync(finalScenes);
+            }
+
+            const outputUrl = await stitchVideos(syncedScenes);
             setFinalVideoUrl(outputUrl);
             setCurrentStep('done');
             addLog('🎬 视频生成完毕！');
@@ -204,7 +269,9 @@ export default function VideoPipeline({ idea, advanced = {}, lang = 'zh', onClos
         }
     };
 
-    const stepOrder = ['tts_luma', 'luma', 'stitch', 'done'];
+    const stepOrder = ['tts_luma', 'luma'];
+    if (videoMode === 'real_person') stepOrder.push('lipsync');
+    stepOrder.push('stitch', 'done');
     const currentStepIndex = stepOrder.indexOf(currentStep);
 
     const allScenesHaveText = scenes.every(s => s.tts_text.trim().length > 0);
@@ -458,10 +525,15 @@ export default function VideoPipeline({ idea, advanced = {}, lang = 'zh', onClos
     // ============== EXECUTE PHASE UI ==============
     const steps = [
         { id: 'tts_luma', label: lang === 'zh' ? '配音 + 触发渲染' : 'TTS + Fire Renders' },
-        { id: 'luma', label: lang === 'zh' ? 'Luma 多镜头渲染' : 'Multi-Scene Rendering' },
-        { id: 'stitch', label: lang === 'zh' ? '剪辑 + 拼接' : 'Edit & Stitch' },
-        { id: 'done', label: lang === 'zh' ? '导出完成' : 'Export Done' },
+        { id: 'luma', label: lang === 'zh' ? '多镜头并行渲染' : 'Multi-Scene Rendering' }
     ];
+    if (videoMode === 'real_person') {
+        steps.push({ id: 'lipsync', label: lang === 'zh' ? 'Kling 唇形同步' : 'Audio Lip Sync' });
+    }
+    steps.push(
+        { id: 'stitch', label: lang === 'zh' ? '云端混流拼接' : 'Edit & Stitch' },
+        { id: 'done', label: lang === 'zh' ? '导出完成' : 'Export Done' }
+    );
 
     return (
         <div className="glass-panel animate-fade-in" style={{ width: '100%' }}>
