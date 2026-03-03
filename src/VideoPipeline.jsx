@@ -331,74 +331,42 @@ export default function VideoPipeline({ idea, advanced = {}, lang = 'zh', onClos
                     />
                 </div>
 
-                {/* Scene Count Selector */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem', padding: '1rem 1.25rem', background: 'rgba(255,255,255,0.02)', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.06)' }}>
-                    <div>
-                        <div style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: '0.95rem' }}>
-                            {lang === 'zh' ? '分镜数量' : 'Scene Count'}
+                {/* Sleek Bottom Control Bar */}
+                <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', padding: '1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                        {/* Scene Count */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{lang === 'zh' ? '分镜数' : 'Scenes'}</span>
+                            <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(0,0,0,0.3)', borderRadius: '8px', padding: '0.2rem' }}>
+                                <button onClick={() => adjustSceneCount(-1)} disabled={sceneCount <= MIN_SCENES} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', padding: '0.2rem 0.5rem', opacity: sceneCount <= MIN_SCENES ? 0.3 : 1 }}><Minus size={14} /></button>
+                                <span style={{ fontSize: '0.9rem', fontWeight: 600, minWidth: '1.2rem', textAlign: 'center' }}>{sceneCount}</span>
+                                <button onClick={() => adjustSceneCount(1)} disabled={sceneCount >= MAX_SCENES} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', padding: '0.2rem 0.5rem', opacity: sceneCount >= MAX_SCENES ? 0.3 : 1 }}><Plus size={14} /></button>
+                            </div>
                         </div>
-                        <div style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', marginTop: '2px' }}>
-                            {lang === 'zh' ? `建议 3 个分镜（2-${MAX_SCENES} 可选）` : `Recommend 3 scenes (${MIN_SCENES}-${MAX_SCENES} available)`}
-                        </div>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                        <button
-                            onClick={() => adjustSceneCount(-1)}
-                            disabled={sceneCount <= MIN_SCENES}
-                            style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', cursor: sceneCount <= MIN_SCENES ? 'not-allowed' : 'pointer', opacity: sceneCount <= MIN_SCENES ? 0.4 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', transition: 'all 0.2s' }}
-                        ><Minus size={16} /></button>
-                        <span style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--accent-primary)', minWidth: '2rem', textAlign: 'center' }}>{sceneCount}</span>
-                        <button
-                            onClick={() => adjustSceneCount(1)}
-                            disabled={sceneCount >= MAX_SCENES}
-                            style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', cursor: sceneCount >= MAX_SCENES ? 'not-allowed' : 'pointer', opacity: sceneCount >= MAX_SCENES ? 0.4 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}
-                        ><Plus size={16} /></button>
-                    </div>
-                </div>
 
-                {/* Video Mode Selector */}
-                <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '1rem', flexDirection: 'column' }}>
-                    <div style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: '0.95rem', marginLeft: '0.2rem' }}>
-                        {lang === 'zh' ? '视频生成模式' : 'Video Generation Mode'}
-                    </div>
-                    <div style={{ display: 'flex', gap: '1rem' }}>
-                        <div
-                            onClick={() => setVideoMode('real_person')}
-                            className="glass-panel"
-                            style={{ flex: 1, padding: '1rem', cursor: 'pointer', border: videoMode === 'real_person' ? '1px solid var(--accent-primary)' : '1px solid rgba(255,255,255,0.05)', background: videoMode === 'real_person' ? 'rgba(139,92,246,0.1)' : 'rgba(255,255,255,0.02)', borderRadius: '12px', transition: 'all 0.2s' }}
-                        >
-                            <h4 style={{ margin: '0 0 0.4rem 0', display: 'flex', alignItems: 'center', gap: '0.4rem', color: videoMode === 'real_person' ? 'var(--accent-primary)' : 'white', fontSize: '0.9rem' }}>
-                                <Sparkles size={16} /> {lang === 'zh' ? 'Mode 1: 真人发声 (Real Person)' : 'Mode 1: Real Person Lip Sync'}
-                            </h4>
-                            <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
-                                {lang === 'zh' ? '画面优先生成适合说话口型的真人，配合配音产生模拟发声效果。' : 'Generates a realistic human speaking directly to the camera based on the script.'}
-                            </p>
-                        </div>
-                        <div
-                            onClick={() => setVideoMode('cartoon')}
-                            className="glass-panel"
-                            style={{ flex: 1, padding: '1rem', cursor: 'pointer', border: videoMode === 'cartoon' ? '1px solid var(--accent-primary)' : '1px solid rgba(255,255,255,0.05)', background: videoMode === 'cartoon' ? 'rgba(139,92,246,0.1)' : 'rgba(255,255,255,0.02)', borderRadius: '12px', transition: 'all 0.2s' }}
-                        >
-                            <h4 style={{ margin: '0 0 0.4rem 0', display: 'flex', alignItems: 'center', gap: '0.4rem', color: videoMode === 'cartoon' ? 'var(--accent-primary)' : 'white', fontSize: '0.9rem' }}>
-                                <Wand2 size={16} /> {lang === 'zh' ? 'Mode 2: 3D卡通旁白 (Cartoon)' : 'Mode 2: Cartoon Animation'}
-                            </h4>
-                            <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
-                                {lang === 'zh' ? '全3D卡通风格动画，旁白仅作为背景解说音，视觉更具趣味性。' : '3D cartoon styled animation with Text-to-Speech narration playing in the background.'}
-                            </p>
+                        {/* Video Mode */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{lang === 'zh' ? '模式' : 'Mode'}</span>
+                            <select
+                                value={videoMode}
+                                onChange={e => setVideoMode(e.target.value)}
+                                style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '0.5rem 0.8rem', borderRadius: '8px', fontSize: '0.85rem', outline: 'none', cursor: 'pointer' }}
+                            >
+                                <option value="real_person" style={{ color: 'black' }}>{lang === 'zh' ? '真人发声 (Real Person)' : 'Real Person'}</option>
+                                <option value="cartoon" style={{ color: 'black' }}>{lang === 'zh' ? '3D卡通旁白 (Cartoon)' : 'Cartoon Animation'}</option>
+                            </select>
                         </div>
                     </div>
-                </div>
 
-                {/* AI Fill All Button */}
-                <div style={{ marginTop: '2rem' }}>
+                    {/* Launch Parse Button */}
                     <button
                         onClick={aiAutoFillAll}
                         disabled={scenes.some(s => s.ai_filling)}
-                        className="btn-secondary"
-                        style={{ width: '100%', justifyContent: 'center', background: 'linear-gradient(135deg, rgba(139,92,246,0.15), rgba(59,130,246,0.1))', border: '1px solid rgba(139,92,246,0.3)', padding: '0.85rem', borderRadius: '12px', fontSize: '0.9rem', fontWeight: 600 }}
+                        className="btn-primary"
+                        style={{ padding: '0.75rem 1.5rem', fontSize: '0.95rem', borderRadius: '12px' }}
                     >
                         {scenes.some(s => s.ai_filling) ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <Sparkles size={16} />}
-                        {lang === 'zh' ? '解析脚本并生成所有分镜' : 'Parse Script & Generate Scenes'}
+                        {lang === 'zh' ? '解析脚本并生成所有分镜' : 'Parse Script & Generate'}
                     </button>
                 </div>
             </div>
@@ -576,15 +544,18 @@ export default function VideoPipeline({ idea, advanced = {}, lang = 'zh', onClos
                 ))}
             </div>
 
-            {/* Final Video */}
+            {/* Final Video - Cinematic Theater */}
             {finalVideoUrl && (
-                <div style={{ textAlign: 'center', marginBottom: '1.5rem', animation: 'fadeIn 0.5s ease' }}>
-                    <h4 style={{ color: '#10b981', marginBottom: '1rem' }}>🎬 视频已生成！</h4>
-                    <video src={finalVideoUrl} controls autoPlay playsInline style={{ maxWidth: '300px', maxHeight: '533px', borderRadius: '16px', border: '2px solid rgba(16,185,129,0.3)', display: 'block', margin: '0 auto' }} />
-                    <a href={finalVideoUrl} download="easymake_director.mp4" className="btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', marginTop: '1.25rem', textDecoration: 'none' }}>
-                        <Download size={16} />
-                        下载 9:16 竖版视频
-                    </a>
+                <div style={{ marginTop: '2.5rem', animation: 'fadeIn 0.5s ease' }}>
+                    <div style={{ position: 'relative', width: '100%', maxWidth: '360px', margin: '0 auto', aspectRatio: '9/16', borderRadius: '24px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.15)', boxShadow: '0 24px 60px rgba(0,0,0,0.8)' }}>
+                        <video src={finalVideoUrl} controls autoPlay playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+
+                        <div style={{ position: 'absolute', bottom: 0, left: 0, width: '100%', padding: '2rem 1.5rem 1.5rem', background: 'linear-gradient(to top, rgba(0,0,0,0.9), transparent)', display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
+                            <a href={finalVideoUrl} download="easymake_director.mp4" className="btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', textDecoration: 'none', padding: '0.8rem 1.8rem', borderRadius: '100px', fontSize: '0.95rem', pointerEvents: 'auto', boxShadow: '0 8px 20px rgba(37,99,235,0.5)' }}>
+                                <Download size={18} /> {lang === 'zh' ? '保存竖版高清视频' : 'Save HD Video'}
+                            </a>
+                        </div>
+                    </div>
                 </div>
             )}
 
