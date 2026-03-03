@@ -171,8 +171,9 @@ async function pollKlingLipSyncStatus(syncTaskId) {
 // Main pipeline: Video + Lip Sync
 export async function executeKlingRealPersonPipeline(scene) {
     try {
-        // Ensure duration is a string
-        const duration = String(scene.duration_seconds || 5);
+        // Clamp to Kling's valid values: "5" or "10"
+        const rawDuration = scene.duration_seconds || 5;
+        const duration = rawDuration <= 5 ? "5" : "10";
 
         // Step 1: Generate video
         const videoTaskId = await fireKlingVideoGeneration(scene.luma_prompt, duration);

@@ -35,7 +35,7 @@ Each scene must have:
 - scene_label_zh: Chinese label (开场钩子 / 核心卖点 / 亮点展示 / 引导行动 / etc.)
 - tts_text: Short punchy Chinese sentence (max 25 chars) for voiceover
 ${modeInstruction}
-- duration_seconds: 4-7 based on tts_text length
+- duration_seconds: 5 or 10 only (5 for short text, 10 for longer text)
 
 Return ONLY raw JSON array. No markdown. No extra text.`
                     },
