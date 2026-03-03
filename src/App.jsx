@@ -243,7 +243,7 @@ const i18n = {
     ctaDesc: "Automatically append high-converting Call-to-Actions (e.g. DM for info)",
     limitReached: "Daily Limit Reached",
     limitReachedDesc: "To control API costs, each user is limited to 99 generations per day (using Luma Ray 2)",
-    generationsLeft: "Daily generations remaining:",
+    generationsLeft: "Daily tries remaining:",
     genTextLabel: "Generate Social Media Copy (DeepSeek)",
     genVideoLabel: "Also Generate Animation (Luma Ray 2)",
     genImageLabel: "Also Generate Image (Luma Photon)",
@@ -279,10 +279,31 @@ function App() {
   const [generateVideoEnabled, setGenerateVideoEnabled] = useState(true);
   const [generateImageEnabled, setGenerateImageEnabled] = useState(true);
   const [pipelineMode, setPipelineMode] = useState(false);
+  const [showDashboard, setShowDashboard] = useState(false);
+  const [generationHistory, setGenerationHistory] = useState([]);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [userEmail, setUserEmail] = useState("");
+  const [showAuth, setShowAuth] = useState(false);
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authMode, setAuthMode] = useState("login"); // "login" or "signup"
+  const [backgroundVideoUrl, setBackgroundVideoUrl] = useState("/brand-video.mp4");
 
   const t = i18n[lang];
 
   useEffect(() => {
+    // Load login state
+    const loginData = localStorage.getItem('easyMakeAuth');
+    if (loginData) {
+      try {
+        const parsed = JSON.parse(loginData);
+        setIsLoggedIn(true);
+        setUserEmail(parsed.email);
+      } catch (e) {
+        console.error('Failed to load auth:', e);
+      }
+    }
+
     // Load daily limit from localStorage
     const today = new Date().toISOString().split('T')[0];
     const storedData = localStorage.getItem('easyMakeUsage');
@@ -296,17 +317,63 @@ function App() {
     } else {
       localStorage.setItem('easyMakeUsage', JSON.stringify({ date: today, count: 0 }));
     }
+
+    // Load generation history from localStorage
+    const historyData = localStorage.getItem('easyMakeHistory');
+    if (historyData) {
+      try {
+        setGenerationHistory(JSON.parse(historyData));
+      } catch (e) {
+        console.error('Failed to load history:', e);
+      }
+    }
   }, []);
 
   const toggleLanguage = () => {
     setLang(lang === "zh" ? "en" : "zh");
   };
 
+  const handleAuth = () => {
+    if (!authEmail.trim() || !authPassword.trim()) {
+      alert(lang === 'zh' ? '请输入邮箱和密码' : 'Please enter email and password');
+      return;
+    }
+    if (!authEmail.includes('@')) {
+      alert(lang === 'zh' ? '请输入有效的邮箱' : 'Please enter a valid email');
+      return;
+    }
+    if (authPassword.length < 6) {
+      alert(lang === 'zh' ? '密码至少需要6个字符' : 'Password must be at least 6 characters');
+      return;
+    }
+
+    // Simple auth simulation (in production, this would call a backend API)
+    localStorage.setItem('easyMakeAuth', JSON.stringify({ email: authEmail }));
+    setIsLoggedIn(true);
+    setUserEmail(authEmail);
+    setShowAuth(false);
+    setAuthEmail("");
+    setAuthPassword("");
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('easyMakeAuth');
+    setIsLoggedIn(false);
+    setUserEmail("");
+    setAppStarted(false);
+  };
+
   const handleGenerate = async () => {
     if (!idea.trim()) return;
 
-    if (generationsUsed >= 99) {
-      alert(`${t.limitReached}\n\n${t.limitReachedDesc}`);
+    if (!isLoggedIn) {
+      setShowAuth(true);
+      setAuthMode("login");
+      return;
+    }
+
+    if (generationsUsed >= 10) {
+      alert(`${t.limitReached}\n\n${lang === 'zh' ? '为控制 API 成本，每个用户每天最多生成 10 次' : 'To control API costs, each user is limited to 10 tries per day'}`);
       return;
     }
 
@@ -350,6 +417,22 @@ function App() {
           videoUrl: finalVideoUrl || "/uk_university_ad.png" // Fallback if no URL returned somehow
         }));
       }
+
+      // Save to generation history
+      const newEntry = {
+        id: Date.now(),
+        timestamp: new Date().toISOString(),
+        idea,
+        industry,
+        lang,
+        text: llmResult.social_media_post,
+        imageUrl: generateImageEnabled ? await generateImage(llmResult.image_prompt).catch(() => null) : null,
+        videoUrl: generateVideoEnabled ? result?.videoUrl : null,
+      };
+
+      const updatedHistory = [newEntry, ...generationHistory].slice(0, 50); // Keep last 50
+      setGenerationHistory(updatedHistory);
+      localStorage.setItem('easyMakeHistory', JSON.stringify(updatedHistory));
 
       setStatus("completed");
 
@@ -534,9 +617,13 @@ function App() {
     <>
       <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 0, overflow: 'hidden' }}>
         <video
-          src="https://cdn.pixabay.com/video/2019/11/04/28830-372993874_large.mp4"
+          src={backgroundVideoUrl}
           autoPlay loop muted playsInline
           style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.6, filter: pipelineMode ? 'blur(30px)' : 'blur(0px)', transition: 'filter 0.8s ease' }}
+          onError={() => {
+            console.error('Error loading background video, using fallback');
+            setBackgroundVideoUrl('https://cdn.pixabay.com/video/2019/11/04/28830-372993874_large.mp4');
+          }}
         />
         <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: 'linear-gradient(to bottom, rgba(5,5,5,0.2), rgba(5,5,5,0.8))' }} />
       </div>
@@ -560,46 +647,391 @@ function App() {
               <Globe size={16} />
               <span style={{ fontFamily: 'Inter', fontWeight: 600 }}>{t.langCode}</span>
             </button>
-            <button className="btn-secondary hide-on-mobile">{t.dashboard}</button>
-            <div className="avatar">EM</div>
+            {isLoggedIn ? (
+              <>
+                <button
+                  className="btn-secondary hide-on-mobile"
+                  onClick={() => setShowDashboard(!showDashboard)}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                >
+                  {showDashboard ? '✕' : t.dashboard}
+                </button>
+                <div
+                  className="avatar"
+                  style={{ cursor: 'pointer', position: 'relative' }}
+                  title={userEmail}
+                >
+                  {userEmail.charAt(0).toUpperCase()}
+                </div>
+                <button
+                  className="btn-secondary"
+                  onClick={handleLogout}
+                  style={{ fontSize: '0.85rem' }}
+                >
+                  {lang === 'zh' ? '登出' : 'Logout'}
+                </button>
+              </>
+            ) : (
+              <button
+                className="btn-primary"
+                onClick={() => { setShowAuth(true); setAuthMode("signup"); }}
+                style={{ fontSize: '0.85rem', padding: '0.6rem 1rem' }}
+              >
+                {lang === 'zh' ? '注册' : 'Sign Up'}
+              </button>
+            )}
           </div>
         </nav>
 
         <main className="app-main">
-          {!appStarted ? (
-            <div className="animate-fade-in" style={{ maxWidth: '1000px', margin: '0 auto', paddingTop: '4rem', paddingBottom: '4rem', textAlign: 'center' }}>
-              <h1 style={{ fontSize: '3.8rem', fontWeight: 800, marginBottom: '1.5rem', background: 'linear-gradient(135deg, #fff, #94a3b8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', lineHeight: 1.1 }}>
-                {lang === 'zh' ? '用 AI 引爆下一篇内容。' : 'Ignite Your Content with AI.'}
-              </h1>
-              <p style={{ fontSize: '1.2rem', color: 'var(--text-secondary)', marginBottom: '4rem', maxWidth: '600px', margin: '0 auto' }}>
-                {lang === 'zh' ? '极简设计搭配强大的 Luma 视频底部引擎。不仅是排版，首先挑选您所在的行业，我们将为您定制专用的核心指令。' : 'Minimalist design powered by the ultimate Luma engine. First, select your industry.'}
-              </p>
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem', textAlign: 'left' }}>
-                {Object.values(IND_CONFIG).map(ind => (
-                  <div
-                    key={ind.id}
-                    onClick={() => { setIndustry(ind.id); setAppStarted(true); window.scrollTo(0, 0); }}
-                    className="glass-panel"
+          {/* Auth Modal */}
+          {showAuth && (
+            <div style={{
+              position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+              background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              zIndex: 100, backdropFilter: 'blur(4px)'
+            }}>
+              <div className="glass-panel" style={{ width: '100%', maxWidth: '400px', margin: '1.5rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+                  <h2 style={{ fontSize: '1.5rem', fontWeight: 700, margin: 0, fontFamily: "'Outfit', sans-serif" }}>
+                    {authMode === 'login' ? (lang === 'zh' ? '登录' : 'Sign In') : (lang === 'zh' ? '注册' : 'Sign Up')}
+                  </h2>
+                  <button
+                    onClick={() => setShowAuth(false)}
                     style={{
-                      cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '1.25rem',
-                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)', border: '1px solid rgba(255,255,255,0.08)', padding: '1.75rem',
-                      background: 'rgba(255,255,255,0.03)', borderRadius: '20px'
+                      background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer',
+                      color: 'var(--text-secondary)'
                     }}
-                    onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-6px)'; e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.borderColor = 'rgba(139,92,246,0.5)'; e.currentTarget.style.boxShadow = '0 12px 30px rgba(139,92,246,0.15)'; }}
-                    onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.boxShadow = 'none'; }}
                   >
-                    <div style={{ background: 'linear-gradient(135deg, var(--accent-primary), #3b82f6)', width: '56px', height: '56px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '16px', color: 'white', flexShrink: 0 }}>
-                      {ind.icon}
-                    </div>
-                    <div>
-                      <h3 style={{ fontSize: '1.15rem', fontWeight: 700, margin: '0 0 0.2rem 0', color: 'var(--text-primary)' }}>{ind[`label_${lang}`]}</h3>
-                      <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                        {lang === 'zh' ? '一键生成专属图文/视频' : 'Tailored texts & videos'}
-                      </p>
-                    </div>
+                    ✕
+                  </button>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
+                  <input
+                    type="email"
+                    className="magic-input"
+                    placeholder={lang === 'zh' ? '邮箱地址' : 'Email'}
+                    value={authEmail}
+                    onChange={e => setAuthEmail(e.target.value)}
+                  />
+                  <input
+                    type="password"
+                    className="magic-input"
+                    placeholder={lang === 'zh' ? '密码（至少6个字符）' : 'Password (min 6 chars)'}
+                    value={authPassword}
+                    onChange={e => setAuthPassword(e.target.value)}
+                  />
+                </div>
+
+                <button
+                  className="btn-primary"
+                  onClick={handleAuth}
+                  style={{ width: '100%', marginBottom: '1rem' }}
+                >
+                  {authMode === 'login' ? (lang === 'zh' ? '登录' : 'Sign In') : (lang === 'zh' ? '注册' : 'Sign Up')}
+                </button>
+
+                <div style={{ textAlign: 'center' }}>
+                  <button
+                    onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')}
+                    style={{
+                      background: 'none', border: 'none', color: 'var(--accent-primary)',
+                      cursor: 'pointer', textDecoration: 'underline', fontSize: '0.9rem'
+                    }}
+                  >
+                    {authMode === 'login'
+                      ? (lang === 'zh' ? '没有账户？注册' : 'No account? Sign up')
+                      : (lang === 'zh' ? '已有账户？登录' : 'Have an account? Sign in')
+                    }
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Dashboard View */}
+          {showDashboard && (
+            <div className="animate-fade-in" style={{ minHeight: '100vh', paddingTop: '2rem', paddingBottom: '4rem' }}>
+              <div style={{ maxWidth: '1200px', margin: '0 auto', width: '100%', padding: '0 1.5rem' }}>
+                <div style={{ marginBottom: '3rem' }}>
+                  <h2 style={{ fontSize: '2.5rem', fontWeight: 800, marginBottom: '0.5rem', fontFamily: "'Outfit', sans-serif" }}>
+                    {lang === 'zh' ? '生成历史' : 'Generation History'}
+                  </h2>
+                  <p style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>
+                    {lang === 'zh' ? `已保存 ${generationHistory.length} 个生成结果` : `${generationHistory.length} saved generations`}
+                  </p>
+                </div>
+
+                {generationHistory.length === 0 ? (
+                  <div className="glass-panel" style={{ textAlign: 'center', padding: '3rem' }}>
+                    <p style={{ fontSize: '1.1rem', color: 'var(--text-secondary)' }}>
+                      {lang === 'zh' ? '还没有生成任何内容，开始创作吧！' : 'No generations yet. Start creating!'}
+                    </p>
                   </div>
-                ))}
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
+                    {generationHistory.map((entry, idx) => (
+                      <div key={entry.id} className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1.5rem' }}>
+                        {/* Timestamp */}
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                          {new Date(entry.timestamp).toLocaleString(lang === 'zh' ? 'zh-CN' : 'en-US')}
+                        </div>
+
+                        {/* Industry Badge */}
+                        <div style={{
+                          display: 'inline-block',
+                          padding: '0.4rem 0.8rem',
+                          borderRadius: '8px',
+                          background: 'rgba(37, 99, 235, 0.15)',
+                          border: '1px solid rgba(37, 99, 235, 0.3)',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          color: 'var(--accent-primary)',
+                          width: 'fit-content'
+                        }}>
+                          {IND_CONFIG[entry.industry][`label_${entry.lang}`]}
+                        </div>
+
+                        {/* Idea Text */}
+                        <div style={{
+                          padding: '1rem',
+                          borderRadius: '12px',
+                          background: 'rgba(0, 0, 0, 0.3)',
+                          fontSize: '0.9rem',
+                          color: 'var(--text-primary)',
+                          lineHeight: 1.5,
+                          maxHeight: '80px',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis'
+                        }}>
+                          {entry.idea}
+                        </div>
+
+                        {/* Preview Images/Videos */}
+                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          {entry.text && (
+                            <div style={{
+                              flex: 1,
+                              minWidth: '80px',
+                              height: '60px',
+                              borderRadius: '8px',
+                              background: 'rgba(37, 99, 235, 0.2)',
+                              border: '1px solid rgba(37, 99, 235, 0.4)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '0.7rem',
+                              color: 'var(--accent-primary)',
+                              fontWeight: 600,
+                              textAlign: 'center'
+                            }}>
+                              📄 {lang === 'zh' ? '文案' : 'Text'}
+                            </div>
+                          )}
+                          {entry.imageUrl && (
+                            <img
+                              src={entry.imageUrl}
+                              alt="Generated"
+                              style={{
+                                width: '80px',
+                                height: '60px',
+                                borderRadius: '8px',
+                                objectFit: 'cover',
+                                border: '1px solid rgba(255,255,255,0.1)'
+                              }}
+                            />
+                          )}
+                          {entry.videoUrl && (
+                            <div style={{
+                              width: '80px',
+                              height: '60px',
+                              borderRadius: '8px',
+                              background: 'rgba(8, 145, 178, 0.2)',
+                              border: '1px solid rgba(8, 145, 178, 0.4)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '0.7rem',
+                              color: 'var(--accent-secondary)',
+                              fontWeight: 600
+                            }}>
+                              🎬 {lang === 'zh' ? '视频' : 'Video'}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* View Button */}
+                        <button
+                          className="btn-secondary"
+                          style={{ width: '100%', marginTop: 'auto' }}
+                          onClick={() => {
+                            setAppStarted(false);
+                            setShowDashboard(false);
+                            setResult(entry);
+                          }}
+                        >
+                          {lang === 'zh' ? '查看详情' : 'View Details'} →
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {showDashboard ? null : !appStarted ? (
+            <div className="animate-fade-in" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', paddingTop: '6rem', paddingBottom: '4rem' }}>
+              {/* Language Toggle - Top Right */}
+              <div style={{ position: 'absolute', top: '2rem', right: '2rem', zIndex: 50 }}>
+                <button
+                  onClick={toggleLanguage}
+                  className="btn-secondary"
+                  style={{ fontSize: '0.85rem', padding: '0.6rem 1.2rem' }}
+                >
+                  {lang === 'zh' ? 'EN' : '中文'}
+                </button>
+              </div>
+
+              {/* Main Content Container */}
+              <div style={{ maxWidth: '1200px', margin: '0 auto', width: '100%', padding: '0 1.5rem' }}>
+                {/* Hero Section */}
+                <div style={{ marginBottom: '5rem', textAlign: 'center' }}>
+                  <div className="hero-badge" style={{ marginBottom: '1.5rem' }}>
+                    ✨ {lang === 'zh' ? '选择行业，定制您的内容引擎' : 'Choose Your Industry, Generate Viral Content'}
+                  </div>
+
+                  <h1 style={{
+                    fontSize: 'clamp(2.5rem, 6vw, 4.5rem)',
+                    fontWeight: 800,
+                    marginBottom: '1.5rem',
+                    background: 'linear-gradient(135deg, #2563EB 0%, #0891B2 100%)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    lineHeight: 1.1,
+                    fontFamily: "'Outfit', sans-serif",
+                    letterSpacing: '-0.03em'
+                  }}>
+                    {lang === 'zh' ? '用 AI 引爆下一篇内容' : 'Ignite Your Content with AI'}
+                  </h1>
+
+                  <p style={{
+                    fontSize: '1.1rem',
+                    color: 'var(--text-secondary)',
+                    marginBottom: '3rem',
+                    maxWidth: '700px',
+                    margin: '0 auto 3rem',
+                    lineHeight: 1.6
+                  }}>
+                    {lang === 'zh'
+                      ? '极简的界面，强大的 Luma 视频引擎。选择您所在的行业，我们将为您定制专用的内容生成指令，一键生成爆款社媒文案和高质量动画。'
+                      : 'Minimalist design powered by Luma Ray 2. Select your industry and instantly generate viral social media content and professional animations tailored to your business.'
+                    }
+                  </p>
+                </div>
+
+                {/* Industry Cards Grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.75rem', marginBottom: '2rem' }}>
+                  {Object.values(IND_CONFIG).map((ind, idx) => (
+                    <div
+                      key={ind.id}
+                      onClick={() => { setIndustry(ind.id); setAppStarted(true); window.scrollTo(0, 0); }}
+                      className="glass-panel"
+                      style={{
+                        cursor: 'pointer',
+                        transition: 'all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                        border: '1px solid rgba(255,255,255,0.08)',
+                        padding: '2.25rem',
+                        background: 'rgba(5, 5, 5, 0.5)',
+                        borderRadius: '24px',
+                        backdropFilter: 'blur(24px)',
+                        animation: `fadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards`,
+                        animationDelay: `${idx * 0.08}s`,
+                        opacity: 0,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '1.25rem',
+                        height: '100%'
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.transform = 'translateY(-12px) scale(1.02)';
+                        e.currentTarget.style.background = 'rgba(5, 5, 5, 0.7)';
+                        e.currentTarget.style.borderColor = 'rgba(37, 99, 235, 0.6)';
+                        e.currentTarget.style.boxShadow = '0 24px 48px rgba(37, 99, 235, 0.25)';
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.transform = 'none';
+                        e.currentTarget.style.background = 'rgba(5, 5, 5, 0.5)';
+                        e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)';
+                        e.currentTarget.style.boxShadow = 'none';
+                      }}
+                    >
+                      {/* Icon with Gradient */}
+                      <div style={{
+                        background: 'linear-gradient(135deg, var(--accent-primary) 0%, #3b82f6 100%)',
+                        width: '72px',
+                        height: '72px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderRadius: '20px',
+                        color: 'white',
+                        flexShrink: 0,
+                        boxShadow: '0 8px 24px rgba(37, 99, 235, 0.3)'
+                      }}>
+                        {ind.icon}
+                      </div>
+
+                      {/* Content */}
+                      <div style={{ flex: 1 }}>
+                        <h3 style={{
+                          fontSize: '1.35rem',
+                          fontWeight: 700,
+                          margin: '0 0 0.5rem 0',
+                          color: 'var(--text-primary)',
+                          fontFamily: "'Outfit', sans-serif",
+                          letterSpacing: '-0.01em'
+                        }}>
+                          {ind[`label_${lang}`]}
+                        </h3>
+                        <p style={{
+                          margin: 0,
+                          fontSize: '0.95rem',
+                          color: 'var(--text-secondary)',
+                          lineHeight: 1.5
+                        }}>
+                          {ind[`badge_${lang}`].replace('✨ ', '')}
+                        </p>
+                      </div>
+
+                      {/* Arrow indicator */}
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        marginTop: 'auto',
+                        paddingTop: '1rem',
+                        borderTop: '1px solid rgba(255,255,255,0.05)'
+                      }}>
+                        <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                          {lang === 'zh' ? '开始创作' : 'Get Started'}
+                        </span>
+                        <ArrowRight size={18} style={{ color: 'var(--accent-primary)', transition: 'transform 0.3s ease' }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Footer CTA */}
+                <div style={{ textAlign: 'center', marginTop: '4rem', paddingTop: '2rem', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                  <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
+                    {lang === 'zh'
+                      ? '💡 每日最多 10 次生成，为您定制专用的核心指令'
+                      : '💡 Up to 10 daily tries with industry-specific optimization'
+                    }
+                  </p>
+                </div>
               </div>
             </div>
           ) : (
@@ -801,7 +1233,14 @@ function App() {
                   <div style={{ marginTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                     {/* Director Mode Banner */}
                     <div
-                      onClick={() => idea.trim() && setPipelineMode(true)}
+                      onClick={() => {
+                        if (!isLoggedIn) {
+                          setShowAuth(true);
+                          setAuthMode("login");
+                          return;
+                        }
+                        if (idea.trim()) setPipelineMode(true);
+                      }}
                       style={{
                         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem',
                         padding: '1rem 1.25rem', borderRadius: '14px', cursor: idea.trim() ? 'pointer' : 'not-allowed',
@@ -827,13 +1266,13 @@ function App() {
 
                   <div className="flex justify-between items-center mt-6 flex-mobile-col">
                     <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                      {t.ideaFooter} • {t.generationsLeft} <strong style={{ color: generationsUsed >= 99 ? '#ef4444' : '#10b981' }}>{99 - generationsUsed}/99</strong>
+                      {t.ideaFooter} • {t.generationsLeft} <strong style={{ color: generationsUsed >= 10 ? '#ef4444' : '#10b981' }}>{10 - generationsUsed}/10</strong>
                     </span>
                     <button
                       className="btn-primary"
                       onClick={handleGenerate}
-                      disabled={!idea.trim() || generationsUsed >= 99}
-                      style={{ opacity: (!idea.trim() || generationsUsed >= 99) ? 0.5 : 1, cursor: (!idea.trim() || generationsUsed >= 99) ? 'not-allowed' : 'pointer' }}
+                      disabled={!idea.trim() || generationsUsed >= 10}
+                      style={{ opacity: (!idea.trim() || generationsUsed >= 10) ? 0.5 : 1, cursor: (!idea.trim() || generationsUsed >= 10) ? 'not-allowed' : 'pointer' }}
                     >
                       <Wand2 size={20} />
                       {t.generateBtn}
