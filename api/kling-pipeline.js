@@ -18,44 +18,62 @@ function generateKlingToken() {
     );
 }
 
+// Helper: Retry with exponential backoff for rate limiting (429)
+async function retryWithBackoff(fn, maxRetries = 3) {
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+            return await fn();
+        } catch (e) {
+            const isRateLimit = e.message.includes('429') || e.message.includes('1303');
+            if (!isRateLimit || attempt === maxRetries - 1) throw e;
+
+            const delay = Math.min(1000 * Math.pow(2, attempt), 10000); // 1s, 2s, 4s, max 10s
+            console.log(`[kling-pipeline] Rate limited, retrying in ${delay}ms... (attempt ${attempt + 1}/${maxRetries})`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+        }
+    }
+}
+
 // Step 1: Generate video using Kling (high quality)
 async function fireKlingVideoGeneration(prompt, duration = '5') {
-    const token = generateKlingToken();
-    console.log('[kling-pipeline] Firing Kling video generation...');
+    return retryWithBackoff(async () => {
+        const token = generateKlingToken();
+        console.log('[kling-pipeline] Firing Kling video generation...');
 
-    const res = await fetch('https://api.klingai.com/v1/videos/text2video', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-            model_name: "kling-v1",
-            prompt,
-            duration,
-            aspect_ratio: "9:16"
-        })
+        const res = await fetch('https://api.klingai.com/v1/videos/text2video', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                model_name: "kling-v1",
+                prompt,
+                duration,
+                aspect_ratio: "9:16"
+            })
+        });
+
+        if (!res.ok) {
+            const errText = await res.text();
+            throw new Error(`Kling API HTTP Error ${res.status}: ${errText}`);
+        }
+
+        let data;
+        try {
+            data = await res.json();
+        } catch (e) {
+            const text = await res.text();
+            throw new Error(`Failed to parse Kling response as JSON: ${text}`);
+        }
+
+        if (data.code !== 0 || !data.data?.task_id) {
+            throw new Error(`Kling Video Generation Error: ${JSON.stringify(data)}`);
+        }
+
+        console.log('[kling-pipeline] Video generation task created:', data.data.task_id);
+        return `kling_${data.data.task_id}`;
     });
-
-    if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(`Kling API HTTP Error ${res.status}: ${errText}`);
-    }
-
-    let data;
-    try {
-        data = await res.json();
-    } catch (e) {
-        const text = await res.text();
-        throw new Error(`Failed to parse Kling response as JSON: ${text}`);
-    }
-
-    if (data.code !== 0 || !data.data?.task_id) {
-        throw new Error(`Kling Video Generation Error: ${JSON.stringify(data)}`);
-    }
-
-    console.log('[kling-pipeline] Video generation task created:', data.data.task_id);
-    return `kling_${data.data.task_id}`;
 }
 
 // Step 2: Poll video generation status
@@ -108,46 +126,48 @@ async function pollKlingVideoStatus(taskId) {
 
 // Step 3: Lip sync with TTS (精细口型同步)
 async function fireKlingLipSync(videoTaskId, ttsText, ttsSpeed = 1.0) {
-    const token = generateKlingToken();
-    const actualTaskId = videoTaskId.replace('kling_', '');
-    console.log('[kling-pipeline] Firing Kling lip sync with TTS...');
+    return retryWithBackoff(async () => {
+        const token = generateKlingToken();
+        const actualTaskId = videoTaskId.replace('kling_', '');
+        console.log('[kling-pipeline] Firing Kling lip sync with TTS...');
 
-    const res = await fetch('https://api.klingai.com/v1/videos/lip-sync', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-            model_name: "kling-v1",
-            input: {
-                origin_task_id: actualTaskId,  // Reference to video task
-                tts_text: ttsText,              // Chinese voiceover text
-                tts_timbre: "male_1",           // Young male voice
-                tts_speed: ttsSpeed
-            }
-        })
+        const res = await fetch('https://api.klingai.com/v1/videos/lip-sync', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                model_name: "kling-v1",
+                input: {
+                    origin_task_id: actualTaskId,  // Reference to video task
+                    tts_text: ttsText,              // Chinese voiceover text
+                    tts_timbre: "male_1",           // Young male voice
+                    tts_speed: ttsSpeed
+                }
+            })
+        });
+
+        if (!res.ok) {
+            const errText = await res.text();
+            throw new Error(`Kling Lip Sync HTTP Error ${res.status}: ${errText}`);
+        }
+
+        let data;
+        try {
+            data = await res.json();
+        } catch (e) {
+            const text = await res.text();
+            throw new Error(`Failed to parse Kling lip sync response as JSON: ${text}`);
+        }
+
+        if (data.code !== 0 || !data.data?.task_id) {
+            throw new Error(`Kling Lip Sync Error: ${JSON.stringify(data)}`);
+        }
+
+        console.log('[kling-pipeline] Lip sync task created:', data.data.task_id);
+        return `kling_lipsync_${data.data.task_id}`;
     });
-
-    if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(`Kling Lip Sync HTTP Error ${res.status}: ${errText}`);
-    }
-
-    let data;
-    try {
-        data = await res.json();
-    } catch (e) {
-        const text = await res.text();
-        throw new Error(`Failed to parse Kling lip sync response as JSON: ${text}`);
-    }
-
-    if (data.code !== 0 || !data.data?.task_id) {
-        throw new Error(`Kling Lip Sync Error: ${JSON.stringify(data)}`);
-    }
-
-    console.log('[kling-pipeline] Lip sync task created:', data.data.task_id);
-    return `kling_lipsync_${data.data.task_id}`;
 }
 
 // Step 4: Poll lip sync status
