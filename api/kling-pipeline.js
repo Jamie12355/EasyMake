@@ -37,7 +37,19 @@ async function fireKlingVideoGeneration(prompt, duration = '5') {
         })
     });
 
-    const data = await res.json();
+    if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`Kling API HTTP Error ${res.status}: ${errText}`);
+    }
+
+    let data;
+    try {
+        data = await res.json();
+    } catch (e) {
+        const text = await res.text();
+        throw new Error(`Failed to parse Kling response as JSON: ${text}`);
+    }
+
     if (data.code !== 0 || !data.data?.task_id) {
         throw new Error(`Kling Video Generation Error: ${JSON.stringify(data)}`);
     }
@@ -64,20 +76,24 @@ async function pollKlingVideoStatus(taskId) {
                 }
             });
 
-            const data = await res.json();
+            if (!res.ok) {
+                console.warn(`[kling-pipeline] Poll HTTP error ${res.status}`);
+            } else {
+                const data = await res.json();
 
-            if (data.code === 0) {
-                const status = data.data?.task_status;
-                console.log(`[kling-pipeline] Video status: ${status}`);
+                if (data.code === 0) {
+                    const status = data.data?.task_status;
+                    console.log(`[kling-pipeline] Video status: ${status}`);
 
-                if (status === 'succeed') {
-                    const videoUrl = data.data?.task_result?.videos?.[0]?.url;
-                    if (videoUrl) {
-                        console.log('[kling-pipeline] Video generation completed');
-                        return videoUrl;
+                    if (status === 'succeed') {
+                        const videoUrl = data.data?.task_result?.videos?.[0]?.url;
+                        if (videoUrl) {
+                            console.log('[kling-pipeline] Video generation completed');
+                            return videoUrl;
+                        }
+                    } else if (status === 'failed') {
+                        throw new Error('Kling video generation failed');
                     }
-                } else if (status === 'failed') {
-                    throw new Error('Kling video generation failed');
                 }
             }
         } catch (e) {
@@ -113,7 +129,19 @@ async function fireKlingLipSync(videoTaskId, ttsText, ttsSpeed = 1.0) {
         })
     });
 
-    const data = await res.json();
+    if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`Kling Lip Sync HTTP Error ${res.status}: ${errText}`);
+    }
+
+    let data;
+    try {
+        data = await res.json();
+    } catch (e) {
+        const text = await res.text();
+        throw new Error(`Failed to parse Kling lip sync response as JSON: ${text}`);
+    }
+
     if (data.code !== 0 || !data.data?.task_id) {
         throw new Error(`Kling Lip Sync Error: ${JSON.stringify(data)}`);
     }
@@ -140,21 +168,25 @@ async function pollKlingLipSyncStatus(syncTaskId) {
                 }
             });
 
-            const data = await res.json();
+            if (!res.ok) {
+                console.warn(`[kling-pipeline] Lip sync poll HTTP error ${res.status}`);
+            } else {
+                const data = await res.json();
 
-            if (data.code === 0) {
-                const status = data.data?.task_status;
-                console.log(`[kling-pipeline] Lip sync status: ${status}`);
+                if (data.code === 0) {
+                    const status = data.data?.task_status;
+                    console.log(`[kling-pipeline] Lip sync status: ${status}`);
 
-                if (status === 'succeed') {
-                    const videoUrl = data.data?.task_result?.videos?.[0]?.url;
-                    if (videoUrl) {
-                        console.log('[kling-pipeline] Lip sync completed');
-                        return videoUrl;
+                    if (status === 'succeed') {
+                        const videoUrl = data.data?.task_result?.videos?.[0]?.url;
+                        if (videoUrl) {
+                            console.log('[kling-pipeline] Lip sync completed');
+                            return videoUrl;
+                        }
+                    } else if (status === 'failed') {
+                        console.warn('[kling-pipeline] Lip sync failed, will use original video');
+                        return null;  // Fallback to original video
                     }
-                } else if (status === 'failed') {
-                    console.warn('[kling-pipeline] Lip sync failed, will use original video');
-                    return null;  // Fallback to original video
                 }
             }
         } catch (e) {
