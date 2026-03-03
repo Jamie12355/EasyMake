@@ -532,16 +532,16 @@ function App() {
 
   return (
     <>
-      <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: -10, overflow: 'hidden' }}>
+      <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 0, overflow: 'hidden' }}>
         <video
-          src="https://cdn.pixabay.com/video/2022/01/21/105374-668987483_large.mp4"
+          src="https://cdn.pixabay.com/video/2019/11/04/28830-372993874_large.mp4"
           autoPlay loop muted playsInline
-          style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.25, filter: pipelineMode ? 'blur(30px)' : 'blur(0px)', transition: 'filter 0.8s ease' }}
+          style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.6, filter: pipelineMode ? 'blur(30px)' : 'blur(0px)', transition: 'filter 0.8s ease' }}
         />
-        <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: 'linear-gradient(to bottom, rgba(5,5,5,0.4), rgba(5,5,5,0.95))' }} />
+        <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: 'linear-gradient(to bottom, rgba(5,5,5,0.2), rgba(5,5,5,0.8))' }} />
       </div>
 
-      <div className="container" style={{ position: 'relative', zIndex: 1 }}>
+      <div className="container" style={{ position: 'relative', zIndex: 10 }}>
         {/* Navbar */}
         <nav className="navbar">
           <div className="logo">
