@@ -229,16 +229,16 @@ export default function VideoPipeline({ idea, advanced = {}, lang = 'zh', onClos
         const validScenes = scenes.filter(s => s.tts_text.trim());
         if (validScenes.length === 0) return;
         setPhase('execute');
-        setCurrentStep('tts_luma');
+        setCurrentStep(videoMode === 'real_person' ? 'kling_video' : 'tts_luma');
         setError(null);
         setLog([]);
         setFinalVideoUrl(null);
         try {
-            addLog(`开始执行 ${validScenes.length} 个分镜的渲染任务...`);
+            addLog(`开始执行 ${validScenes.length} 个分镜的渲染任务... (${videoMode === 'real_person' ? 'Kling AI 模式' : 'Luma + MiniMax 模式'})`);
             const res = await fetch('/api/pipeline-execute', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ scenes: validScenes })
+                body: JSON.stringify({ scenes: validScenes, videoMode })  // ✓ 传递 videoMode
             });
             if (!res.ok) {
                 const err = await res.json();
@@ -246,20 +246,28 @@ export default function VideoPipeline({ idea, advanced = {}, lang = 'zh', onClos
             }
             const { scenes: enriched } = await res.json();
             setScenes(enriched);
-            addLog(`✅ Luma 任务已提交，配音已生成！`);
-            setCurrentStep('luma');
-            const finalScenes = await pollScenes(enriched);
-            let syncedScenes = finalScenes;
 
             if (videoMode === 'real_person') {
-                setCurrentStep('lipsync');
-                syncedScenes = await performLipSync(finalScenes);
-            }
+                // ✓ Kling 模式: 视频 + TTS + 唇形同步已经全部完成
+                addLog(`✅ Kling AI 生成完毕 (视频 + 配音 + 唇形同步)！`);
+                setCurrentStep('done');
 
-            const outputUrl = await stitchVideos(syncedScenes);
-            setFinalVideoUrl(outputUrl);
-            setCurrentStep('done');
-            addLog('🎬 视频生成完毕！');
+                // 直接使用第一个分镜的视频作为预览
+                const firstVideo = enriched.find(s => s.video_url);
+                if (firstVideo) {
+                    setFinalVideoUrl(firstVideo.video_url);
+                    addLog('🎬 视频预览已加载！');
+                }
+            } else {
+                // 卡通模式: 保持原有流程 (Luma + MiniMax + Shotstack)
+                addLog(`✅ Luma + MiniMax 任务已提交！`);
+                setCurrentStep('luma');
+                const finalScenes = await pollScenes(enriched);
+                const outputUrl = await stitchVideos(finalScenes);
+                setFinalVideoUrl(outputUrl);
+                setCurrentStep('done');
+                addLog('🎬 视频生成完毕！');
+            }
         } catch (err) {
             const errMsg = err?.message || String(err) || '未知错误，请检查浏览器控制台';
             setError(errMsg);
@@ -269,9 +277,13 @@ export default function VideoPipeline({ idea, advanced = {}, lang = 'zh', onClos
         }
     };
 
-    const stepOrder = ['tts_luma', 'luma'];
-    if (videoMode === 'real_person') stepOrder.push('lipsync');
-    stepOrder.push('stitch', 'done');
+    // ✓ 简化步骤顺序: 真人模式和卡通模式不同
+    let stepOrder = [];
+    if (videoMode === 'real_person') {
+        stepOrder = ['kling_video', 'done'];  // 简洁: 视频生成 → 完成
+    } else {
+        stepOrder = ['tts_luma', 'luma', 'stitch', 'done'];  // 卡通: 保持原有流程
+    }
     const currentStepIndex = stepOrder.indexOf(currentStep);
 
     const allScenesHaveText = scenes.every(s => s.tts_text.trim().length > 0);
@@ -491,17 +503,18 @@ export default function VideoPipeline({ idea, advanced = {}, lang = 'zh', onClos
     }
 
     // ============== EXECUTE PHASE UI ==============
-    const steps = [
-        { id: 'tts_luma', label: lang === 'zh' ? '配音 + 触发渲染' : 'TTS + Fire Renders' },
-        { id: 'luma', label: lang === 'zh' ? '多镜头并行渲染' : 'Multi-Scene Rendering' }
-    ];
-    if (videoMode === 'real_person') {
-        steps.push({ id: 'lipsync', label: lang === 'zh' ? 'Kling 唇形同步' : 'Audio Lip Sync' });
-    }
-    steps.push(
-        { id: 'stitch', label: lang === 'zh' ? '云端混流拼接' : 'Edit & Stitch' },
-        { id: 'done', label: lang === 'zh' ? '导出完成' : 'Export Done' }
-    );
+    // ✓ 真人模式: Kling AI (简洁流程) | 卡通模式: Luma + Shotstack (原有流程)
+    const steps = videoMode === 'real_person'
+        ? [
+            { id: 'kling_video', label: lang === 'zh' ? 'Kling 视频生成' : 'Kling AI Rendering' },
+            { id: 'done', label: lang === 'zh' ? '导出完成' : 'Export Done' }
+        ]
+        : [
+            { id: 'tts_luma', label: lang === 'zh' ? '配音 + 触发渲染' : 'TTS + Fire Renders' },
+            { id: 'luma', label: lang === 'zh' ? '多镜头并行渲染' : 'Multi-Scene Rendering' },
+            { id: 'stitch', label: lang === 'zh' ? '云端混流拼接' : 'Edit & Stitch' },
+            { id: 'done', label: lang === 'zh' ? '导出完成' : 'Export Done' }
+        ];
 
     return (
         <div className="glass-panel animate-fade-in" style={{ width: '100%' }}>

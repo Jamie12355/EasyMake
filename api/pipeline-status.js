@@ -23,7 +23,40 @@ export default async function handler(req, res) {
 
     try {
         const results = await Promise.all(jobIds.map(async (id) => {
+            if (id.startsWith('kling_lipsync_')) {
+                // ===== Handle Kling Lip Sync task =====
+                const klingTaskId = id.replace('kling_lipsync_', '');
+                const token = generateKlingToken();
+                const pollRes = await fetch(`https://api.klingai.com/v1/videos/lip-sync/${klingTaskId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!pollRes.ok) {
+                    return { id, status: 'failed', video_url: null };
+                }
+
+                const payload = await pollRes.json();
+                const stateMap = {
+                    'submitted': 'pending',
+                    'processing': 'dreaming',
+                    'succeed': 'completed',
+                    'failed': 'failed'
+                };
+
+                const taskStatus = payload.data?.task_status || 'failed';
+                const mappedStatus = stateMap[taskStatus] || 'failed';
+                const videoUrl = payload.data?.task_result?.videos?.[0]?.url || null;
+
+                return {
+                    id,
+                    status: mappedStatus,
+                    video_url: videoUrl,
+                    progress: null
+                };
+            }
+
             if (id.startsWith('kling_')) {
+                // ===== Handle Kling Video Generation task =====
                 const klingTaskId = id.replace('kling_', '');
                 const token = generateKlingToken();
                 const pollRes = await fetch(`https://api.klingai.com/v1/videos/text2video/${klingTaskId}`, {

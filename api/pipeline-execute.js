@@ -1,5 +1,6 @@
-// Executes the pipeline for user-defined scenes (fires Luma + TTS)
-// Called after the user finalizes their storyboard in the Plan phase
+// Executes the pipeline for user-defined scenes
+// For real_person mode: Uses Kling AI (video + TTS + lip-sync in one flow)
+// For cartoon mode: Uses Luma + MiniMax TTS (existing flow)
 
 // Hardcoded fallbacks so env vars never cause URL parse errors
 const LLM_BASE_URL = process.env.VITE_LLM_BASE_URL || 'https://api.deepseek.com';
@@ -82,6 +83,7 @@ export const config = {
 };
 
 import { put } from '@vercel/blob';
+import { executeKlingRealPersonPipeline } from './kling-pipeline.js';
 
 // --- API Helper Functions ---
 async function generateMiniMaxTTS(text, groupId, apiKey) {
@@ -158,47 +160,74 @@ async function autoGenerateLumaPrompt(ttsText, sceneLabel) {
 export default async function handler(req, res) {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-    const { scenes } = req.body;
+    const { scenes, videoMode = 'real_person' } = req.body;
     const minimaxGroupId = process.env.MINIMAX_GROUP_ID;
     const minimaxApiKey = process.env.MINIMAX_API_KEY;
 
-    if (!minimaxGroupId || !minimaxApiKey) {
-        return res.status(500).json({ error: 'MiniMax TTS not configured in environment variables.' });
+    // Only check MiniMax config for cartoon mode
+    if (videoMode === 'cartoon' && (!minimaxGroupId || !minimaxApiKey)) {
+        return res.status(500).json({ error: 'MiniMax TTS not configured for cartoon mode.' });
     }
 
     try {
-        const enrichedScenes = await Promise.all(scenes.map(async (scene) => {
-            // If no luma_prompt provided, auto-generate one from the tts_text
-            const lumaPrompt = scene.luma_prompt?.trim()
-                ? scene.luma_prompt
-                : await autoGenerateLumaPrompt(scene.tts_text, scene.scene_label || 'Main Scene');
+        let enrichedScenes;
 
-            const [lumaId, ttsAudioBase64] = await Promise.all([
-                fireVideoGeneration(lumaPrompt),
-                generateMiniMaxTTS(scene.tts_text, minimaxGroupId, minimaxApiKey)
-            ]);
+        if (videoMode === 'real_person') {
+            // ===== REAL PERSON MODE: Use Kling AI =====
+            // Kling handles: Video Generation + TTS + Lip Sync in one unified flow
+            console.log('[Execute Pipeline] Using Kling AI for real person mode');
 
-            // Convert Base64 data URI to Buffer for Blob upload
-            const base64Data = ttsAudioBase64.split(',')[1] || ttsAudioBase64;
-            const audioBuffer = Buffer.from(base64Data, 'base64');
+            enrichedScenes = await Promise.all(scenes.map(async (scene) => {
+                try {
+                    const result = await executeKlingRealPersonPipeline(scene);
+                    return {
+                        ...scene,
+                        luma_job_id: result.job_id,
+                        tts_audio_url: result.tts_audio_url,  // null for Kling (embedded in video)
+                        video_url: result.video_url,           // Already synced video
+                        status: result.status
+                    };
+                } catch (e) {
+                    console.error(`[Execute Pipeline] Kling pipeline failed for scene: ${e.message}`);
+                    throw e;  // Re-throw to stop processing
+                }
+            }));
+        } else {
+            // ===== CARTOON MODE: Use Luma + MiniMax (existing flow) =====
+            console.log('[Execute Pipeline] Using Luma + MiniMax for cartoon mode');
 
-            // Upload to Vercel Blob to get a public URL for Shotstack
-            const blobUpload = await put(`tts-${Date.now()}-${Math.random().toString(36).substring(7)}.mp3`, audioBuffer, {
-                access: 'public',
-                contentType: 'audio/mp3'
-            });
+            enrichedScenes = await Promise.all(scenes.map(async (scene) => {
+                // If no luma_prompt provided, auto-generate one from the tts_text
+                const lumaPrompt = scene.luma_prompt?.trim()
+                    ? scene.luma_prompt
+                    : await autoGenerateLumaPrompt(scene.tts_text, scene.scene_label || 'Main Scene');
 
-            return {
-                ...scene,
-                luma_prompt: lumaPrompt,
-                luma_job_id: lumaId,
-                tts_audio: ttsAudioBase64,       // Keeping base64 just in case frontend still wants to play it
-                tts_audio_url: blobUpload.url,   // NEW: The public URL for Shotstack
-                video_url: null,
-                status: 'rendering'
-            };
-        }));
+                const [lumaId, ttsAudioBase64] = await Promise.all([
+                    fireVideoGeneration(lumaPrompt),
+                    generateMiniMaxTTS(scene.tts_text, minimaxGroupId, minimaxApiKey)
+                ]);
 
+                // Convert Base64 data URI to Buffer for Blob upload
+                const base64Data = ttsAudioBase64.split(',')[1] || ttsAudioBase64;
+                const audioBuffer = Buffer.from(base64Data, 'base64');
+
+                // Upload to Vercel Blob to get a public URL for Shotstack
+                const blobUpload = await put(`tts-${Date.now()}-${Math.random().toString(36).substring(7)}.mp3`, audioBuffer, {
+                    access: 'public',
+                    contentType: 'audio/mp3'
+                });
+
+                return {
+                    ...scene,
+                    luma_prompt: lumaPrompt,
+                    luma_job_id: lumaId,
+                    tts_audio: ttsAudioBase64,
+                    tts_audio_url: blobUpload.url,
+                    video_url: null,
+                    status: 'rendering'
+                };
+            }));
+        }
 
         return res.status(200).json({ scenes: enrichedScenes });
     } catch (error) {
