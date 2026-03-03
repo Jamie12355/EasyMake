@@ -27,6 +27,56 @@ async function fireLumaVideo(prompt) {
     return data.id;
 }
 
+import jwt from 'jsonwebtoken';
+
+function generateKlingToken() {
+    const ak = process.env.VITE_KLING_AK || 'ALAnrRPrhAb9dfmLgKyKBnYBtJmAeDCM';
+    const sk = process.env.VITE_KLING_SK || 'YghMPk3NgnY4JrtBJrNbCDkPDPyrdy88';
+    return jwt.sign(
+        {
+            iss: ak,
+            exp: Math.floor(Date.now() / 1000) + 1800,
+            nbf: Math.floor(Date.now() / 1000) - 5
+        },
+        sk,
+        { header: { alg: 'HS256', typ: 'JWT' } }
+    );
+}
+
+async function fireKlingVideo(prompt) {
+    const token = generateKlingToken();
+    const res = await fetch('https://api.klingai.com/v1/videos/text2video', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+            model_name: "kling-v1",
+            prompt,
+            duration: "5",
+            aspect_ratio: "9:16"
+        })
+    });
+
+    const data = await res.json();
+    if (data.code !== 0 || !data.data?.task_id) {
+        throw new Error(`Kling Error: ${JSON.stringify(data)}`);
+    }
+
+    return `kling_${data.data.task_id}`;
+}
+
+async function fireVideoGeneration(prompt) {
+    try {
+        console.log('[fireVideoGeneration] Attempting Kling AI first...');
+        return await fireKlingVideo(prompt);
+    } catch (e) {
+        console.warn('[fireVideoGeneration] Kling failed, falling back to Luma:', e.message);
+        return await fireLumaVideo(prompt);
+    }
+}
+
 export const config = {
     maxDuration: 60, // Luma Ray 2 queue can be slow, giving Vercel fn max time
 };
@@ -124,7 +174,7 @@ export default async function handler(req, res) {
                 : await autoGenerateLumaPrompt(scene.tts_text, scene.scene_label || 'Main Scene');
 
             const [lumaId, ttsAudioBase64] = await Promise.all([
-                fireLumaVideo(lumaPrompt),
+                fireVideoGeneration(lumaPrompt),
                 generateMiniMaxTTS(scene.tts_text, minimaxGroupId, minimaxApiKey)
             ]);
 

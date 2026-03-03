@@ -8,7 +8,11 @@ const LLM_MODEL = process.env.VITE_LLM_MODEL || 'deepseek-chat';
 export default async function handler(req, res) {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-    const { idea, advanced = {}, scene_count = 3 } = req.body;
+    const { idea, advanced = {}, scene_count = 3, videoMode = 'real_person' } = req.body;
+
+    const modeInstruction = videoMode === 'real_person'
+        ? "- luma_prompt: Detailed English visual prompt (9:16 vertical). MUST describe a realistic human (e.g., student, consultant) looking directly at the camera, talking and naturally lip-syncing to the viewer."
+        : "- luma_prompt: Detailed English visual prompt (9:16 vertical). MUST describe a high-quality 3D cartoon/Pixar styled animation. Do NOT include a real person.";
 
     try {
         const llmRes = await fetch(`${LLM_BASE_URL}/chat/completions`, {
@@ -30,7 +34,7 @@ Each scene must have:
 - scene_label: English label (Hook / Main Message / Highlight / Call to Action / etc.)
 - scene_label_zh: Chinese label (开场钩子 / 核心卖点 / 亮点展示 / 引导行动 / etc.)
 - tts_text: Short punchy Chinese sentence (max 25 chars) for voiceover
-- luma_prompt: Detailed English Luma Ray 2 visual prompt (9:16 vertical, cinematic, study abroad theme)
+${modeInstruction}
 - duration_seconds: 4-7 based on tts_text length
 
 Return ONLY raw JSON array. No markdown. No extra text.`

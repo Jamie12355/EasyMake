@@ -504,6 +504,7 @@ function App() {
                     autoPlay
                     loop
                     muted
+                    playsInline
                     controls
                     style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', inset: 0 }}
                   />

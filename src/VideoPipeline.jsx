@@ -19,9 +19,11 @@ const MIN_SCENES = 2;
 const MAX_SCENES = 5;
 
 export default function VideoPipeline({ idea, advanced = {}, lang = 'zh', onClose }) {
-    // Phase: 'plan' | 'execute' | 'done'
-    const [phase, setPhase] = useState('plan');
+    // Phase: 'input' | 'review' | 'execute' | 'done'
+    const [phase, setPhase] = useState('input');
     const [sceneCount, setSceneCount] = useState(3);
+    const [scriptInput, setScriptInput] = useState(idea || '');
+    const [videoMode, setVideoMode] = useState('real_person'); // 'real_person' | 'cartoon'
     const [scenes, setScenes] = useState([DEFAULT_SCENE(1), DEFAULT_SCENE(2), DEFAULT_SCENE(3)]);
     const [log, setLog] = useState([]);
     const [currentStep, setCurrentStep] = useState('');
@@ -60,7 +62,7 @@ export default function VideoPipeline({ idea, advanced = {}, lang = 'zh', onClos
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    idea: `为以下视频分镜写一句中文旁白：\n主题：${idea || '留学机构介绍'}\n场景角色：${scene.scene_label_zh}（${scene.scene_label}）\n要求：不超过25个中文字，简洁有力，适合视频配音`,
+                    idea: `为以下视频分镜写一句中文旁白：\n视频模式要求：${videoMode === 'cartoon' ? '3D卡通风格，不要出现真人' : '真人出镜，自然说话口型'}\n主题：${idea || '留学机构介绍'}\n场景角色：${scene.scene_label_zh}（${scene.scene_label}）\n要求：不超过25个中文字，简洁有力，适合视频配音`,
                     advanced: { ...advanced, _singleLine: true }
                 })
             });
@@ -86,7 +88,7 @@ export default function VideoPipeline({ idea, advanced = {}, lang = 'zh', onClos
             const res = await fetch('/api/pipeline-generate-script', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ idea, advanced, scene_count: sceneCount })
+                body: JSON.stringify({ idea: scriptInput, advanced, scene_count: sceneCount, videoMode })
             });
             if (!res.ok) throw new Error('Script generation failed');
             const { scenes: generated } = await res.json();
@@ -96,6 +98,7 @@ export default function VideoPipeline({ idea, advanced = {}, lang = 'zh', onClos
                 ai_filling: false,
                 status: 'pending'
             })));
+            setPhase('review');
         } catch (e) {
             console.error('Auto fill all failed:', e);
             setScenes(prev => prev.map(s => ({ ...s, ai_filling: false })));
@@ -141,7 +144,7 @@ export default function VideoPipeline({ idea, advanced = {}, lang = 'zh', onClos
             const res = await fetch('/api/pipeline-stitch', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ scenes: validScenes })
+                body: JSON.stringify({ scenes: validScenes, brandName: 'EasyMake' })
             });
 
             if (!res.ok) {
@@ -229,8 +232,8 @@ export default function VideoPipeline({ idea, advanced = {}, lang = 'zh', onClos
         }
     };
 
-    // ============== PLAN PHASE UI ==============
-    if (phase === 'plan') {
+    // ============== INPUT PHASE UI ==============
+    if (phase === 'input') {
         return (
             <div className="glass-panel animate-fade-in" style={{ width: '100%' }}>
                 {/* Header */}
@@ -238,13 +241,27 @@ export default function VideoPipeline({ idea, advanced = {}, lang = 'zh', onClos
                     <div>
                         <h2 className="card-title m-0" style={{ fontSize: '1.3rem' }}>
                             <Film size={20} style={{ display: 'inline', marginRight: '0.7rem', color: 'var(--accent-primary)' }} />
-                            {lang === 'zh' ? '🎬 视频导演模式 — 分镜编辑器' : '🎬 Director Mode — Storyboard Editor'}
+                            {lang === 'zh' ? '🎬 视频导演模式 — 输入脚本' : '🎬 Director Mode — Input Script'}
                         </h2>
                         <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginTop: '0.25rem' }}>
-                            {lang === 'zh' ? '自定义分镜数量，手动输入配音脚本，或让 AI 一键填充' : 'Set scene count, write scripts manually, or let AI fill them in'}
+                            {lang === 'zh' ? '输入您的完整配音脚本，我们将为您智能拆分并生成分镜提示词' : 'Input your full voiceover script, and we will intelligently break it down into scenes and prompts'}
                         </p>
                     </div>
                     {onClose && <button className="btn-secondary" onClick={onClose} style={{ fontSize: '0.8rem' }}>✕</button>}
+                </div>
+
+                {/* Script Input Textarea */}
+                <div style={{ marginBottom: '1.5rem' }}>
+                    <label style={{ display: 'block', color: 'var(--text-primary)', fontWeight: 600, fontSize: '0.95rem', marginBottom: '0.5rem' }}>
+                        {lang === 'zh' ? '完整视频文案（旁白配音）' : 'Full Voiceover Script'}
+                    </label>
+                    <textarea
+                        className="magic-input"
+                        value={scriptInput}
+                        onChange={e => setScriptInput(e.target.value)}
+                        placeholder={lang === 'zh' ? '在此处粘贴您想让配音朗读的完整脚本文案...' : 'Paste your full voiceover script here...'}
+                        style={{ minHeight: '120px', fontSize: '0.9rem', padding: '1rem', background: 'rgba(0,0,0,0.2)', borderRadius: '12px', resize: 'vertical' }}
+                    />
                 </div>
 
                 {/* Scene Count Selector */}
@@ -272,8 +289,41 @@ export default function VideoPipeline({ idea, advanced = {}, lang = 'zh', onClos
                     </div>
                 </div>
 
+                {/* Video Mode Selector */}
+                <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '1rem', flexDirection: 'column' }}>
+                    <div style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: '0.95rem', marginLeft: '0.2rem' }}>
+                        {lang === 'zh' ? '视频生成模式' : 'Video Generation Mode'}
+                    </div>
+                    <div style={{ display: 'flex', gap: '1rem' }}>
+                        <div
+                            onClick={() => setVideoMode('real_person')}
+                            className="glass-panel"
+                            style={{ flex: 1, padding: '1rem', cursor: 'pointer', border: videoMode === 'real_person' ? '1px solid var(--accent-primary)' : '1px solid rgba(255,255,255,0.05)', background: videoMode === 'real_person' ? 'rgba(139,92,246,0.1)' : 'rgba(255,255,255,0.02)', borderRadius: '12px', transition: 'all 0.2s' }}
+                        >
+                            <h4 style={{ margin: '0 0 0.4rem 0', display: 'flex', alignItems: 'center', gap: '0.4rem', color: videoMode === 'real_person' ? 'var(--accent-primary)' : 'white', fontSize: '0.9rem' }}>
+                                <Sparkles size={16} /> {lang === 'zh' ? 'Mode 1: 真人发声 (Real Person)' : 'Mode 1: Real Person Lip Sync'}
+                            </h4>
+                            <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                                {lang === 'zh' ? '画面优先生成适合说话口型的真人，配合配音产生模拟发声效果。' : 'Generates a realistic human speaking directly to the camera based on the script.'}
+                            </p>
+                        </div>
+                        <div
+                            onClick={() => setVideoMode('cartoon')}
+                            className="glass-panel"
+                            style={{ flex: 1, padding: '1rem', cursor: 'pointer', border: videoMode === 'cartoon' ? '1px solid var(--accent-primary)' : '1px solid rgba(255,255,255,0.05)', background: videoMode === 'cartoon' ? 'rgba(139,92,246,0.1)' : 'rgba(255,255,255,0.02)', borderRadius: '12px', transition: 'all 0.2s' }}
+                        >
+                            <h4 style={{ margin: '0 0 0.4rem 0', display: 'flex', alignItems: 'center', gap: '0.4rem', color: videoMode === 'cartoon' ? 'var(--accent-primary)' : 'white', fontSize: '0.9rem' }}>
+                                <Wand2 size={16} /> {lang === 'zh' ? 'Mode 2: 3D卡通旁白 (Cartoon)' : 'Mode 2: Cartoon Animation'}
+                            </h4>
+                            <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                                {lang === 'zh' ? '全3D卡通风格动画，旁白仅作为背景解说音，视觉更具趣味性。' : '3D cartoon styled animation with Text-to-Speech narration playing in the background.'}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
                 {/* AI Fill All Button */}
-                <div style={{ marginBottom: '1.5rem' }}>
+                <div style={{ marginTop: '2rem' }}>
                     <button
                         onClick={aiAutoFillAll}
                         disabled={scenes.some(s => s.ai_filling)}
@@ -281,9 +331,37 @@ export default function VideoPipeline({ idea, advanced = {}, lang = 'zh', onClos
                         style={{ width: '100%', justifyContent: 'center', background: 'linear-gradient(135deg, rgba(139,92,246,0.15), rgba(59,130,246,0.1))', border: '1px solid rgba(139,92,246,0.3)', padding: '0.85rem', borderRadius: '12px', fontSize: '0.9rem', fontWeight: 600 }}
                     >
                         {scenes.some(s => s.ai_filling) ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <Sparkles size={16} />}
-                        {lang === 'zh' ? 'AI 一键生成全部分镜脚本' : 'AI Auto-Generate All Scene Scripts'}
+                        {lang === 'zh' ? '解析脚本并生成所有分镜' : 'Parse Script & Generate Scenes'}
                     </button>
                 </div>
+            </div>
+        );
+    }
+
+    // ============== REVIEW PHASE UI ==============
+    if (phase === 'review') {
+        return (
+            <div className="glass-panel animate-fade-in" style={{ width: '100%' }}>
+                <div className="flex justify-between items-center mb-6">
+                    <div>
+                        <h2 className="card-title m-0" style={{ fontSize: '1.3rem' }}>
+                            <Film size={20} style={{ display: 'inline', marginRight: '0.7rem', color: 'var(--accent-primary)' }} />
+                            {lang === 'zh' ? '👀 审核并确认分镜提示词' : '👀 Review & Confirm Scene Prompts'}
+                        </h2>
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginTop: '0.25rem' }}>
+                            {lang === 'zh' ? '你可以基于喜好修改生成的提示词文案，确认无误再提交API生成视频' : 'You can edit the generated prompts based on your preference before calling the API'}
+                        </p>
+                    </div>
+                    {onClose && <button className="btn-secondary" onClick={onClose} style={{ fontSize: '0.8rem' }}>✕</button>}
+                </div>
+
+                {/* Back to Input Action */}
+                <button
+                    onClick={() => setPhase('input')}
+                    style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', padding: 0, marginBottom: '1.5rem' }}
+                >
+                    <ChevronRight size={14} style={{ transform: 'rotate(180deg)' }} /> {lang === 'zh' ? '返回修改源脚本' : 'Back to Script'}
+                </button>
 
                 {/* Scene Cards */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginBottom: '2rem' }}>
@@ -307,7 +385,7 @@ export default function VideoPipeline({ idea, advanced = {}, lang = 'zh', onClos
                                     style={{ fontSize: '0.75rem', padding: '0.35rem 0.75rem', opacity: scene.ai_filling ? 0.6 : 1 }}
                                 >
                                     {scene.ai_filling ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Sparkles size={12} />}
-                                    {lang === 'zh' ? 'AI 填充' : 'AI Fill'}
+                                    {lang === 'zh' ? 'AI 重新生成该幕' : 'Regenerate Scene'}
                                 </button>
                             </div>
 
@@ -430,7 +508,7 @@ export default function VideoPipeline({ idea, advanced = {}, lang = 'zh', onClos
             {finalVideoUrl && (
                 <div style={{ textAlign: 'center', marginBottom: '1.5rem', animation: 'fadeIn 0.5s ease' }}>
                     <h4 style={{ color: '#10b981', marginBottom: '1rem' }}>🎬 视频已生成！</h4>
-                    <video src={finalVideoUrl} controls autoPlay style={{ maxWidth: '300px', maxHeight: '533px', borderRadius: '16px', border: '2px solid rgba(16,185,129,0.3)', display: 'block', margin: '0 auto' }} />
+                    <video src={finalVideoUrl} controls autoPlay playsInline style={{ maxWidth: '300px', maxHeight: '533px', borderRadius: '16px', border: '2px solid rgba(16,185,129,0.3)', display: 'block', margin: '0 auto' }} />
                     <a href={finalVideoUrl} download="easymake_director.mp4" className="btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', marginTop: '1.25rem', textDecoration: 'none' }}>
                         <Download size={16} />
                         下载 9:16 竖版视频

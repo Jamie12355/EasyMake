@@ -8,7 +8,7 @@ export default async function handler(req, res) {
     }
 
     try {
-        const { scenes } = req.body;
+        const { scenes, brandName = 'EasyMake' } = req.body;
 
         if (!scenes || !Array.isArray(scenes) || scenes.length === 0) {
             return res.status(400).json({ error: 'Valid scenes array is required' });
@@ -32,11 +32,27 @@ export default async function handler(req, res) {
             };
         });
 
+        // Add Outro clip with company brand
+        videoClips.push({
+            asset: {
+                type: 'title',
+                text: brandName,
+                style: 'minimal',
+                color: '#ffffff',
+                size: 'medium'
+            },
+            start: scenes.length * 5,
+            length: 3,
+            transition: { in: 'fade', out: 'fade' }
+        });
+
         const audioClips = scenes.map((scene, i) => {
+            const isLast = i === scenes.length - 1;
             return {
                 asset: { type: 'audio', src: scene.tts_audio_url },
                 start: i * 5,
-                length: 5
+                length: isLast ? 6 : 5, // Give the last audio an extra second to trail off naturally into the outro
+                transition: isLast ? { out: 'fade' } : undefined
             };
         });
 
