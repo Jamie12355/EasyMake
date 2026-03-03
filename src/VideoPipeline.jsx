@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Film, Mic, Scissors, Download, CheckCircle2, Loader2, AlertCircle, Play, ChevronRight, Plus, Minus, Sparkles, Pencil, ArrowRight } from 'lucide-react';
+import { Film, Mic, Scissors, Download, CheckCircle2, Loader2, AlertCircle, Play, ChevronRight, Plus, Minus, Sparkles, Pencil, ArrowRight, Wand2 } from 'lucide-react';
 
 
 const DEFAULT_SCENE = (id) => ({
