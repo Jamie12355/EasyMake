@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install)",
+      "Bash(npm run dev)",
+      "Bash(npm run build)",
+      "Bash(curl -s http://localhost:5174/)",
+      "Bash(curl -I http://localhost:5174/brand-video.mp4)",
+      "WebFetch(domain:app.klingai.com)",
+      "WebFetch(domain:piapi.ai)",
+      "Read(//c/Users/Administrator/Desktop/EasyMake/**)",
+      "Bash(node api/__tests__/kling-api-validation.js)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\Administrator\\Desktop\\EasyMake\\Media"
+    ]
+  }
+}

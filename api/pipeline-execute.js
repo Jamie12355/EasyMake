@@ -23,12 +23,16 @@ async function fireLumaVideo(prompt) {
             loop: false
         })
     });
-    if (!res.ok) throw new Error(`Luma Error: ${await res.text()}`);
+    if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`Luma HTTP Error ${res.status}: ${errText}`);
+    }
     let data;
     try {
         data = await res.json();
     } catch (parseErr) {
-        throw new Error(`Failed to parse Luma response as JSON: ${parseErr.message}`);
+        const errText = await res.text();
+        throw new Error(`Failed to parse Luma response as JSON: ${errText}`);
     }
     return data.id;
 }
@@ -64,6 +68,11 @@ async function fireKlingVideo(prompt) {
             aspect_ratio: "9:16"
         })
     });
+
+    if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`Kling HTTP Error ${res.status}: ${errText}`);
+    }
 
     let data;
     try {
@@ -122,11 +131,16 @@ async function generateMiniMaxTTS(text, groupId, apiKey) {
             }
         })
     });
+    if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`MiniMax HTTP Error ${res.status}: ${errText}`);
+    }
     let data;
     try {
         data = await res.json();
     } catch (parseErr) {
-        throw new Error(`Failed to parse MiniMax response as JSON: ${parseErr.message}`);
+        const errText = await res.text();
+        throw new Error(`Failed to parse MiniMax response as JSON: ${errText}`);
     }
     const hex = data.data?.audio;
     if (!hex) throw new Error(`MiniMax Error: ${JSON.stringify(data.base_resp)}`);
