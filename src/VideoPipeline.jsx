@@ -311,6 +311,14 @@ export default function VideoPipeline({ idea, advanced = {}, lang = 'zh', onClos
         }
     };
 
+    // Retry the entire pipeline from the beginning
+    const retryFullPipeline = () => {
+        setError(null);
+        setFinalVideoUrl(null);
+        setLog([]);
+        setPhase('review');  // Go back to review phase to allow modifications
+    };
+
     // ============== INPUT PHASE UI ==============
     if (phase === 'input') {
         return (
@@ -578,25 +586,49 @@ export default function VideoPipeline({ idea, advanced = {}, lang = 'zh', onClos
                     <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'flex-start' }}>
                         <AlertCircle size={16} color="#ef4444" style={{ flexShrink: 0, marginTop: '2px' }} />
                         <div style={{ flex: 1 }}>
-                            <p style={{ color: '#ef4444', fontWeight: 600, margin: '0 0 0.2rem' }}>错误</p>
+                            <p style={{ color: '#ef4444', fontWeight: 600, margin: '0 0 0.2rem' }}>{lang === 'zh' ? '错误' : 'Error'}</p>
                             <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', margin: 0 }}>{error}</p>
                         </div>
                     </div>
-                    {canRetryStitch && (
-                        <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(239,68,68,0.15)' }}>
-                            <p style={{ color: '#f59e0b', fontSize: '0.8rem', marginBottom: '0.75rem' }}>
-                                ✅ 所有视频和配音已就绪——可以直接重试剪辑而无需重新渲染
-                            </p>
-                            <button
-                                onClick={retryStitch}
-                                className="btn-primary"
-                                style={{ fontSize: '0.85rem', padding: '0.6rem 1.2rem', gap: '0.5rem' }}
-                            >
-                                <Scissors size={15} />
-                                重试剪辑拼接 (Retry Stitch)
-                            </button>
-                        </div>
-                    )}
+                    <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(239,68,68,0.15)', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                        {canRetryStitch ? (
+                            <>
+                                <p style={{ color: '#f59e0b', fontSize: '0.8rem', marginBottom: 0, width: '100%' }}>
+                                    ✅ {lang === 'zh' ? '所有视频和配音已就绪——可以直接重试剪辑而无需重新渲染' : 'All videos and audio are ready — retry stitching without re-rendering'}
+                                </p>
+                                <button
+                                    onClick={retryStitch}
+                                    className="btn-primary"
+                                    style={{ fontSize: '0.85rem', padding: '0.6rem 1.2rem', gap: '0.5rem' }}
+                                >
+                                    <Scissors size={15} />
+                                    {lang === 'zh' ? '重试剪辑拼接' : 'Retry Stitching'}
+                                </button>
+                            </>
+                        ) : (
+                            <>
+                                <p style={{ color: '#f59e0b', fontSize: '0.8rem', marginBottom: 0, width: '100%' }}>
+                                    🔄 {lang === 'zh' ? '请重试生成视频或返回修改脚本' : 'Try regenerating or go back to modify the script'}
+                                </p>
+                                <button
+                                    onClick={retryFullPipeline}
+                                    className="btn-primary"
+                                    style={{ fontSize: '0.85rem', padding: '0.6rem 1.2rem', gap: '0.5rem' }}
+                                >
+                                    <Loader2 size={15} />
+                                    {lang === 'zh' ? '重新生成视频' : 'Retry Generation'}
+                                </button>
+                                <button
+                                    onClick={() => setPhase('review')}
+                                    className="btn-secondary"
+                                    style={{ fontSize: '0.85rem', padding: '0.6rem 1.2rem', gap: '0.5rem' }}
+                                >
+                                    <Pencil size={15} />
+                                    {lang === 'zh' ? '修改脚本' : 'Edit Script'}
+                                </button>
+                            </>
+                        )}
+                    </div>
                 </div>
             )}
 
