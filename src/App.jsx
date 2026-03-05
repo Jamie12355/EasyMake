@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Sparkles, Wand2, Copy, Video, CheckCircle2, ArrowRight, Play, FastForward, Globe, Settings2, ChevronDown, ChevronUp, Image, Film, Briefcase, ShoppingBag, Home, MapPin, Rocket } from 'lucide-react';
 import { generateContent, generateVideo, generateImage } from './api';
 import VideoPipeline from './VideoPipeline';
+import VideoGallery from './VideoGallery';
 import ShotstackTest from './ShotstackTest';
 import './index.css';
 import './App.css';
@@ -280,6 +281,7 @@ function App() {
   const [generateImageEnabled, setGenerateImageEnabled] = useState(true);
   const [pipelineMode, setPipelineMode] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
+  const [showGallery, setShowGallery] = useState(false);
   const [generationHistory, setGenerationHistory] = useState([]);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userEmail, setUserEmail] = useState("");
@@ -651,6 +653,15 @@ function App() {
               <>
                 <button
                   className="btn-secondary hide-on-mobile"
+                  onClick={() => setShowGallery(!showGallery)}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                  title={lang === 'zh' ? '视频库' : 'Video Gallery'}
+                >
+                  <Film size={16} />
+                  {showGallery ? '✕' : (lang === 'zh' ? '视频库' : 'Gallery')}
+                </button>
+                <button
+                  className="btn-secondary hide-on-mobile"
                   onClick={() => setShowDashboard(!showDashboard)}
                   style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                 >
@@ -881,7 +892,19 @@ function App() {
             </div>
           )}
 
-          {showDashboard ? null : !appStarted ? (
+          {/* Gallery View */}
+          {showGallery && (
+            <div className="animate-fade-in" style={{ minHeight: '100vh', paddingTop: '2rem', paddingBottom: '4rem' }}>
+              <div style={{ maxWidth: '1400px', margin: '0 auto', width: '100%', padding: '0 1.5rem' }}>
+                <VideoGallery
+                  onClose={() => setShowGallery(false)}
+                  lang={lang}
+                />
+              </div>
+            </div>
+          )}
+
+          {(showDashboard || showGallery) ? null : !appStarted ? (
             <div className="animate-fade-in" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', paddingTop: '6rem', paddingBottom: '4rem' }}>
               {/* Language Toggle - Top Right */}
               <div style={{ position: 'absolute', top: '2rem', right: '2rem', zIndex: 50 }}>
