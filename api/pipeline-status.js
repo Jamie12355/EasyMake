@@ -35,7 +35,14 @@ export default async function handler(req, res) {
                     return { id, status: 'failed', video_url: null };
                 }
 
-                const payload = await pollRes.json();
+                let payload;
+                try {
+                    payload = await pollRes.json();
+                } catch (parseErr) {
+                    console.error(`Failed to parse lip sync response for ${id}:`, parseErr.message);
+                    return { id, status: 'failed', video_url: null };
+                }
+
                 const stateMap = {
                     'submitted': 'pending',
                     'processing': 'dreaming',
@@ -67,7 +74,14 @@ export default async function handler(req, res) {
                     return { id, status: 'failed', video_url: null };
                 }
 
-                const payload = await pollRes.json();
+                let payload;
+                try {
+                    payload = await pollRes.json();
+                } catch (parseErr) {
+                    console.error(`Failed to parse video generation response for ${id}:`, parseErr.message);
+                    return { id, status: 'failed', video_url: null };
+                }
+
                 const stateMap = {
                     'submitted': 'pending',
                     'processing': 'dreaming',
@@ -95,7 +109,14 @@ export default async function handler(req, res) {
                 return { id, status: 'failed', video_url: null };
             }
 
-            const data = await pollRes.json();
+            let data;
+            try {
+                data = await pollRes.json();
+            } catch (parseErr) {
+                console.error(`Failed to parse Luma response for ${id}:`, parseErr.message);
+                return { id, status: 'failed', video_url: null };
+            }
+
             const videoUrl = data.assets?.video || null;
 
             return {

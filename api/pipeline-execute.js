@@ -24,7 +24,12 @@ async function fireLumaVideo(prompt) {
         })
     });
     if (!res.ok) throw new Error(`Luma Error: ${await res.text()}`);
-    const data = await res.json();
+    let data;
+    try {
+        data = await res.json();
+    } catch (parseErr) {
+        throw new Error(`Failed to parse Luma response as JSON: ${parseErr.message}`);
+    }
     return data.id;
 }
 
@@ -60,7 +65,13 @@ async function fireKlingVideo(prompt) {
         })
     });
 
-    const data = await res.json();
+    let data;
+    try {
+        data = await res.json();
+    } catch (parseErr) {
+        const errText = await res.text();
+        throw new Error(`Failed to parse Kling response as JSON: ${errText}`);
+    }
     if (data.code !== 0 || !data.data?.task_id) {
         throw new Error(`Kling Error: ${JSON.stringify(data)}`);
     }
@@ -111,7 +122,12 @@ async function generateMiniMaxTTS(text, groupId, apiKey) {
             }
         })
     });
-    const data = await res.json();
+    let data;
+    try {
+        data = await res.json();
+    } catch (parseErr) {
+        throw new Error(`Failed to parse MiniMax response as JSON: ${parseErr.message}`);
+    }
     const hex = data.data?.audio;
     if (!hex) throw new Error(`MiniMax Error: ${JSON.stringify(data.base_resp)}`);
     const bytes = Buffer.from(hex, 'hex');
@@ -149,7 +165,13 @@ async function autoGenerateLumaPrompt(ttsText, sceneLabel) {
             })
         });
         if (!res.ok) return fallbackPrompt;
-        const data = await res.json();
+        let data;
+        try {
+            data = await res.json();
+        } catch (parseErr) {
+            console.warn('[autoGenerateLumaPrompt] Failed to parse LLM response as JSON:', parseErr.message);
+            return fallbackPrompt;
+        }
         return data.choices?.[0]?.message?.content?.trim() || fallbackPrompt;
     } catch (e) {
         console.warn('[autoGenerateLumaPrompt] Failed, using fallback:', e.message);

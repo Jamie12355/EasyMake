@@ -97,7 +97,14 @@ async function pollKlingVideoStatus(taskId) {
             if (!res.ok) {
                 console.warn(`[kling-pipeline] Poll HTTP error ${res.status}`);
             } else {
-                const data = await res.json();
+                let data;
+                try {
+                    data = await res.json();
+                } catch (parseErr) {
+                    const text = await res.text();
+                    console.warn(`[kling-pipeline] Failed to parse video status response as JSON: ${text}`);
+                    continue;
+                }
 
                 if (data.code === 0) {
                     const status = data.data?.task_status;
@@ -191,7 +198,14 @@ async function pollKlingLipSyncStatus(syncTaskId) {
             if (!res.ok) {
                 console.warn(`[kling-pipeline] Lip sync poll HTTP error ${res.status}`);
             } else {
-                const data = await res.json();
+                let data;
+                try {
+                    data = await res.json();
+                } catch (parseErr) {
+                    const text = await res.text();
+                    console.warn(`[kling-pipeline] Failed to parse lip sync status response as JSON: ${text}`);
+                    continue;
+                }
 
                 if (data.code === 0) {
                     const status = data.data?.task_status;

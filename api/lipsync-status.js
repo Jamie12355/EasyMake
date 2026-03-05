@@ -37,7 +37,13 @@ export default async function handler(req, res) {
                 return { id: taskId, status: 'failed', error: await apiRes.text() };
             }
 
-            const data = await apiRes.json();
+            let data;
+            try {
+                data = await apiRes.json();
+            } catch (parseErr) {
+                console.error(`Failed to parse lip sync response for ${taskId}:`, parseErr.message);
+                return { id: taskId, status: 'failed', error: 'Invalid JSON response' };
+            }
 
             // Kling AI status mapping:
             // 10 = queued, 50 = running, 99 = completed, 100 = failed

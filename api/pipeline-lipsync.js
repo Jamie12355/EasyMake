@@ -40,7 +40,13 @@ export default async function handler(req, res) {
             })
         });
 
-        const klingData = await klingRes.json();
+        let klingData;
+        try {
+            klingData = await klingRes.json();
+        } catch (parseErr) {
+            const errText = await klingRes.text();
+            throw new Error(`Failed to parse Kling lip sync response as JSON: ${errText}`);
+        }
 
         if (klingData.code !== 0 || !klingData.data?.task_id) {
             throw new Error(`Kling Lip Sync Error: ${JSON.stringify(klingData)}`);
